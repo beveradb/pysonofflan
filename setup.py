@@ -11,7 +11,7 @@ with open('README.rst') as readme_file:
 with open('HISTORY.rst') as history_file:
     history = history_file.read()
 
-requirements = ['Click>=6.0', ]
+requirements = ['Click>=6.0', 'websockets']
 
 setup_requirements = [ ]
 
@@ -36,7 +36,7 @@ setup(
     description="Interface for Sonoff devices running original Itead firmware, in LAN mode.",
     entry_points={
         'console_scripts': [
-            'pysonofflan=pysonofflan.cli:main',
+            'pysonofflan=pysonofflan.cli:cli',
         ],
     },
     install_requires=requirements,
