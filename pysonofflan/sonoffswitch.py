@@ -92,7 +92,11 @@ class SonoffSwitch(SonoffDevice):
         :raises SonoffDeviceException: on error
         """
         await self._update_helper(
-            self.client.get_update_payload(self.device_id, {"switch": "on"}))
+            self.client.get_update_payload(
+                await self.device_id,
+                {"switch": "on"}
+            )
+        )
 
     async def turn_off(self):
         """
@@ -101,4 +105,8 @@ class SonoffSwitch(SonoffDevice):
         :raises SonoffDeviceException: on error
         """
         await self._update_helper(
-            self.client.get_update_payload(self.device_id, {"switch": "off"}))
+            self.client.get_update_payload(
+                await self.device_id,
+                {"switch": "off"}
+            )
+        )

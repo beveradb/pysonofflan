@@ -41,6 +41,7 @@ class SonoffDevice(object):
         :raises SonoffDeviceException: if command was not executed correctly
         """
 
+        _LOGGER.debug("Sending update payload to device: %s", payload)
         try:
             response = await self.client.send(request=payload)
         except Exception as ex:
@@ -112,8 +113,6 @@ class SonoffDevice(object):
         raise NotImplementedError("Device subclass needs to implement this.")
 
     def __repr__(self):
-        return "<%s at %s (%s), is_on: %s>" % (
+        return "<%s at %s>" % (
             self.__class__.__name__,
-            self.host,
-            self.device_id,
-            self.is_on)
+            self.host)

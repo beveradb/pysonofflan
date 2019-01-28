@@ -94,7 +94,8 @@ def state(device: SonoffSwitch):
 
     try:
         device_id = asyncio.get_event_loop().run_until_complete(
-            device.device_id)
+            device.device_id
+        )
     except Exception as ex:
         click.echo("Error getting device ID: %s" % ex)
         return None
@@ -111,24 +112,18 @@ def state(device: SonoffSwitch):
 
 @cli.command()
 @pass_sonoff_switch
-def on(device: SonoffSwitch, index):
+def on(device: SonoffSwitch):
     """Turn the device on."""
     click.echo("Turning on..")
-    if index is None:
-        asyncio.get_event_loop().run_until_complete(device.turn_on())
-    else:
-        asyncio.get_event_loop().run_until_complete(device.turn_on())
+    asyncio.get_event_loop().run_until_complete(device.turn_on())
 
 
 @cli.command()
 @pass_sonoff_switch
-async def off(device: SonoffSwitch, index):
+async def off(device: SonoffSwitch):
     """Turn the device off."""
     click.echo("Turning off..")
-    if index is None:
-        asyncio.get_event_loop().run_until_complete(device.turn_off())
-    else:
-        asyncio.get_event_loop().run_until_complete(device.turn_off())
+    asyncio.get_event_loop().run_until_complete(device.turn_off())
 
 
 if __name__ == "__main__":
