@@ -1,6 +1,4 @@
-import datetime
 import logging
-from typing import Any, Dict, Optional
 
 from pysonofflan import SonoffDevice
 
@@ -44,7 +42,7 @@ class SonoffSwitch(SonoffDevice):
                   SWITCH_STATE_UNKNOWN
         :rtype: str
         """
-        state = self.basic_info['state']
+        state = (await self.get_basic_info())['state']
 
         if state == "off":
             return SonoffSwitch.SWITCH_STATE_OFF
@@ -69,9 +67,9 @@ class SonoffSwitch(SonoffDevice):
         if not isinstance(value, str):
             raise ValueError("State must be str, not of %s.", type(value))
         elif value.upper() == SonoffSwitch.SWITCH_STATE_ON:
-            self.turn_on()
+            await self.turn_on()
         elif value.upper() == SonoffSwitch.SWITCH_STATE_OFF:
-            self.turn_off()
+            await self.turn_off()
         else:
             raise ValueError("State %s is not valid.", value)
 
@@ -93,7 +91,7 @@ class SonoffSwitch(SonoffDevice):
 
         :raises SonoffDeviceException: on error
         """
-        self._update_helper(self.client.get_update_payload(self.device_id, {"switch": "on"}))
+        await self._update_helper(self.client.get_update_payload(self.device_id, {"switch": "on"}))
 
     async def turn_off(self):
         """
@@ -101,4 +99,4 @@ class SonoffSwitch(SonoffDevice):
 
         :raises SonoffDeviceException: on error
         """
-        self._update_helper(self.client.get_update_payload(self.device_id, {"switch": "off"}))
+        await self._update_helper(self.client.get_update_payload(self.device_id, {"switch": "off"}))

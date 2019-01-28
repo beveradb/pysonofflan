@@ -61,7 +61,7 @@ class SonoffLANModeClient:
             'ts': 0
         }
 
-    async def connect(self) -> None:
+    async def connect(self, timeout=3) -> None:
         """
         Connect to the Sonoff LAN Mode Device and set up handler for receiving messages.
         :return:
@@ -69,10 +69,10 @@ class SonoffLANModeClient:
         websocket_address = 'ws://%s:%s/' % (self.host, self.port)
         _LOGGER.debug('Connecting to websocket address: %s', websocket_address)
 
-        async with websockets.connect(websocket_address) as websocket:
+        async with websockets.connect(websocket_address, timeout=timeout) as websocket:
             self.websocket = websocket
-            response = self.send(self.get_user_online_payload())
-            self.basic_device_info = json.loads(response)
+            response = await self.send(self.get_user_online_payload())
+            self.basic_device_info = response
 
     async def send(self, request: Union[str, Dict]) -> Dict:
         """
@@ -103,6 +103,8 @@ class SonoffLANModeClient:
     async def get_basic_info(self) -> Dict:
         if self.websocket is None:
             await self.connect()
+
+        _LOGGER.debug('get_basic_info returning: %s', self.basic_device_info)
 
         return self.basic_device_info
 

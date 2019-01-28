@@ -2,7 +2,8 @@ import ipaddress
 import json
 import logging
 import socket
-from typing import Dict
+from itertools import chain
+from typing import Dict, Optional
 
 from pysonofflan import (SonoffLANModeClient)
 
@@ -26,16 +27,24 @@ class Discover:
         devices = {}
 
         try:
-            for ip in ipaddress.IPv4Network('192.168.0.0/23'):
-                device_id = await Discover.discover_single(ip)
-                if device_id is not None:
-                    devices[ip] = device_id
+            local_ip_ranges = chain(
+                ipaddress.IPv4Network('127.0.0.1/32'),
+                ipaddress.IPv4Network('192.168.0.0/24'),
+                ipaddress.IPv4Network('192.168.1.0/24')
+            )
+
+            for ip in local_ip_ranges:
+                _LOGGER.debug("Attempting connection to IP: %s" % ip)
+                device_info = await Discover.discover_single(ip)
+                if device_info is not None:
+                    devices[ip] = device_info['deviceid']
         except Exception as ex:
-            _LOGGER.error("Got exception %s", ex, exc_info=True)
+            _LOGGER.error("Got Exception %s", ex, exc_info=False)
+
         return devices
 
     @staticmethod
-    async def discover_single(host: str) -> str:
+    async def discover_single(host: str) -> Optional[dict]:
         """
         Attempt to connect to a single host, returning device ID if successful.
 
@@ -44,8 +53,13 @@ class Discover:
         :return: Device ID of found device
         """
 
-        client = SonoffLANModeClient(host)
-        await client.connect()
-        info = await client.get_basic_info()
+        info = None
 
-        return info.device_id
+        try:
+            client = SonoffLANModeClient(host)
+            await client.connect(timeout=1)
+            info = await client.get_basic_info()
+        except ConnectionRefusedError as ex:
+            _LOGGER.error("Got ConnectionRefusedError %s", ex, exc_info=False)
+
+        return info

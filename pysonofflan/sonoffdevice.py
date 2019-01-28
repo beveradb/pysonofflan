@@ -70,7 +70,7 @@ class SonoffDevice(object):
         :return: Device ID.
         :rtype: str
         """
-        return str((await self.get_basic_info()).device_id)
+        return str((await self.get_basic_info())['deviceid'])
 
     async def turn_off(self) -> None:
         """
