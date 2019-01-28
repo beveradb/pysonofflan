@@ -12,8 +12,9 @@ class Discover:
     @staticmethod
     async def discover() -> Dict[str, str]:
         """
-        Attempts websocket connection on port 8081 to all IP addresses on common home IP subnets:
-        192.168.0.X and 192.168.1.X, in the hope of detecting  available supported devices in the local network.
+        Attempts websocket connection on port 8081 to all IP addresses on
+        common home IP subnets: 192.168.0.X and 192.168.1.X, in the hope of
+        detecting  available supported devices in the local network.
 
         :rtype: dict
         :return: Array of devices {"ip": "device_id"}

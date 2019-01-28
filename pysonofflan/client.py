@@ -64,7 +64,7 @@ class SonoffLANModeClient:
 
     async def connect(self, connect_timeout=DEFAULT_TIMEOUT) -> None:
         """
-        Connect to the Sonoff LAN Mode Device and set up handler for receiving messages.
+        Connect to the Sonoff LAN Mode Device and set up communication channel.
         :return:
         """
         websocket_address = 'ws://%s:%s/' % (self.host, self.port)
@@ -72,8 +72,12 @@ class SonoffLANModeClient:
 
         try:
             async with timeout(connect_timeout):
-                async with websockets.connect(websocket_address, timeout=connect_timeout, ping_timeout=connect_timeout,
-                                              close_timeout=connect_timeout) as websocket:
+                async with websockets.connect(
+                    websocket_address,
+                    timeout=connect_timeout,
+                    ping_timeout=connect_timeout,
+                    close_timeout=connect_timeout
+                ) as websocket:
                     self.websocket = websocket
                     response = await self.send(self.get_user_online_payload())
                     self.basic_device_info = response
@@ -86,9 +90,10 @@ class SonoffLANModeClient:
 
     async def send(self, request: Union[str, Dict]) -> Dict:
         """
-        Send message to an already-connected Sonoff LAN Mode Device and return the response.
+        Send message to an already-connected Sonoff LAN Mode Device
+        and return the response.
 
-        :param request: command to send to the device (can be either dict or json string)
+        :param request: command to send to the device (can be dict or json)
         :return:
         """
         if self.websocket is None:

@@ -22,7 +22,8 @@ pass_sonoff_switch = click.make_pass_decorator(SonoffSwitch)
 @click.option('--debug/--normal', default=False)
 @click.pass_context
 def cli(ctx, host, device_id, debug):
-    """A cli tool for controlling Sonoff Smart Switches/Plugs (Basic/S20/Touch) in LAN Mode."""
+    """A cli tool for controlling Sonoff Smart Switches/Plugs
+    (Basic/S20/Touch) in LAN Mode."""
     if debug:
         logging.basicConfig(level=logging.DEBUG)
     else:
@@ -32,7 +33,8 @@ def cli(ctx, host, device_id, debug):
         return
 
     if device_id is not None and host is None:
-        click.echo("Device ID is given, using discovery to find host %s" % device_id)
+        click.echo(
+            "Device ID is given, using discovery to find host %s" % device_id)
         host = find_host_from_device_id(device_id=device_id)
         if host:
             click.echo("Matching Device ID found! IP: %s" % host)
@@ -41,7 +43,8 @@ def cli(ctx, host, device_id, debug):
             return
 
     if host is None:
-        click.echo("No host name given - try discovery mode to find your device!")
+        click.echo(
+            "No host name given - try discovery mode to find your device!")
         sys.exit(1)
 
     click.echo("Initialising SonoffSwitch with host %s" % host)
@@ -56,20 +59,29 @@ def cli(ctx, host, device_id, debug):
 @cli.command()
 def discover():
     """Discover devices in the network."""
-    click.echo("Attempting to discover Sonoff LAN Mode devices on the local network, please wait...")
-    found_devices = asyncio.get_event_loop().run_until_complete(Discover.discover()).items()
+    click.echo(
+        "Attempting to discover Sonoff LAN Mode devices "
+        "on the local network, please wait..."
+    )
+    found_devices = asyncio.get_event_loop().run_until_complete(
+        Discover.discover()).items()
     for ip, found_device_id in found_devices:
-        click.echo("Found Sonoff LAN Mode device at IP %s with ID: %s" % (ip, found_device_id))
+        click.echo("Found Sonoff LAN Mode device at IP %s with ID: %s" % (
+            ip, found_device_id))
 
     return found_devices
 
 
 def find_host_from_device_id(device_id):
     """Discover a device identified by its device_id"""
-    click.echo("Trying to discover %s by scanning for devices on local network, please wait..." % device_id)
-    found_devices = asyncio.get_event_loop().run_until_complete(Discover.discover()).items()
+    click.echo(
+        "Trying to discover %s by scanning for devices "
+        "on local network, please wait..." % device_id)
+    found_devices = asyncio.get_event_loop().run_until_complete(
+        Discover.discover()).items()
     for ip, found_device_id in found_devices:
-        click.echo("Found Sonoff LAN Mode device at IP %s with ID: %s" % (ip, found_device_id))
+        click.echo("Found Sonoff LAN Mode device at IP %s with ID: %s"
+                   % (ip, found_device_id))
         if found_device_id.lower() == device_id.lower():
             return ip
     return None
@@ -81,7 +93,8 @@ def state(device: SonoffSwitch):
     """Print out device ID and state."""
 
     try:
-        device_id = asyncio.get_event_loop().run_until_complete(device.device_id)
+        device_id = asyncio.get_event_loop().run_until_complete(
+            device.device_id)
     except Exception as ex:
         click.echo("Error getting device ID: %s" % ex)
         return None

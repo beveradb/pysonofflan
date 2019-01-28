@@ -1,6 +1,6 @@
 """
 pysonofflan
-Python library supporting Sonoff Smart Switches/Plugs (Basic/S20/Touch) in LAN Mode.
+Python library supporting Sonoff Smart Devices (Basic/S20/Touch) in LAN Mode.
 """
 import logging
 from typing import Any, Dict, Optional
@@ -50,7 +50,8 @@ class SonoffDevice(object):
 
     async def get_basic_info(self) -> dict:
         """
-        Retrieve basic information about this device - only the ID is really useful for now.
+        Retrieve basic information about this device - only ID is really
+        useful for now.
 
         :return: basic_info
         :rtype dict
