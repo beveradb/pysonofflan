@@ -3,7 +3,6 @@ pysonofflan
 Python library supporting Sonoff Smart Switches/Plugs (Basic/S20/Touch) in LAN Mode.
 """
 import logging
-from collections import defaultdict
 from typing import Any, Dict, Optional
 
 from .client import SonoffLANModeClient

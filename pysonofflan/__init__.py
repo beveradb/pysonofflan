@@ -17,7 +17,7 @@ The feature is designed to only be used when there is no connection to the Itead
 As such, it is only enabled when the device is connected to your WiFi network, but *unable to reach the Itead servers*.
 Most users will only be able to make use of this mode by deliberately blocking internet access to their Sonoff devices.
 
-All common, shared functionalities are available through `SonoffDevice` class:
+All common, shared functionality is available through `SonoffDevice` class:
 
     x = SonoffDevice("192.168.1.1")
     print(x.sys_info)
@@ -34,6 +34,6 @@ __version__ = '0.1.0'
 
 # flake8: noqa
 from .client import SonoffLANModeClient
+from .discover import Discover
 from .sonoffdevice import SonoffDevice, SonoffDeviceException
 from .sonoffswitch import SonoffSwitch
-from .discover import Discover

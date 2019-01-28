@@ -38,7 +38,7 @@ class SonoffLANModeClient:
             'action': "userOnline",
             'userAgent': 'app',
             'version': 6,
-            'nonce': ''.join([str(random.randint(0, 9)) for i in range(15)]),
+            'nonce': ''.join([str(random.randint(0, 9)) for _ in range(15)]),
             'apkVesrion': "1.8",
             'os': 'ios',
             'at': 'at',  # No bearer token needed in LAN mode
@@ -92,10 +92,7 @@ class SonoffLANModeClient:
         :return:
         """
         if self.websocket is None:
-            try:
-                await self.connect()
-            except Exception as ex:
-                raise
+            await self.connect()
 
         if isinstance(request, dict):
             request = json.dumps(request)
@@ -115,10 +112,7 @@ class SonoffLANModeClient:
 
     async def get_basic_info(self) -> Dict:
         if self.websocket is None:
-            try:
-                await self.connect()
-            except Exception as ex:
-                raise
+            await self.connect()
 
         _LOGGER.debug('get_basic_info returning: %s', self.basic_device_info)
 
@@ -126,9 +120,6 @@ class SonoffLANModeClient:
 
     async def get_latest_params(self) -> Dict:
         if self.websocket is None:
-            try:
-                await self.connect()
-            except Exception as ex:
-                raise
+            await self.connect()
 
         return self.latest_params

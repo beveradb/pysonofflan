@@ -1,14 +1,15 @@
 import asyncio
-import sys
-import click
 import logging
+import sys
+
+import click
+
+from pysonofflan import (SonoffSwitch, Discover)
 
 if sys.version_info < (3, 5):
     print("To use this script you need python 3.5 or newer! got %s" %
           sys.version_info)
     sys.exit(1)
-
-from pysonofflan import (SonoffSwitch, Discover)
 
 pass_sonoff_switch = click.make_pass_decorator(SonoffSwitch)
 
@@ -56,18 +57,18 @@ def cli(ctx, host, device_id, debug):
 def discover():
     """Discover devices in the network."""
     click.echo("Attempting to discover Sonoff LAN Mode devices on the local network, please wait...")
-    found_devs = asyncio.get_event_loop().run_until_complete(Discover.discover()).items()
-    for ip, found_device_id in found_devs:
+    found_devices = asyncio.get_event_loop().run_until_complete(Discover.discover()).items()
+    for ip, found_device_id in found_devices:
         click.echo("Found Sonoff LAN Mode device at IP %s with ID: %s" % (ip, found_device_id))
 
-    return found_devs
+    return found_devices
 
 
 def find_host_from_device_id(device_id):
     """Discover a device identified by its device_id"""
     click.echo("Trying to discover %s by scanning for devices on local network, please wait..." % device_id)
-    found_devs = asyncio.get_event_loop().run_until_complete(Discover.discover()).items()
-    for ip, found_device_id in found_devs:
+    found_devices = asyncio.get_event_loop().run_until_complete(Discover.discover()).items()
+    for ip, found_device_id in found_devices:
         click.echo("Found Sonoff LAN Mode device at IP %s with ID: %s" % (ip, found_device_id))
         if found_device_id.lower() == device_id.lower():
             return ip
