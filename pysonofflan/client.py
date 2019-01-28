@@ -5,6 +5,7 @@ import time
 from typing import Dict, Union
 
 import websockets
+from async_timeout import timeout
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -14,7 +15,7 @@ class SonoffLANModeClient:
     Implementation of the Sonoff LAN Mode Protocol (as used by the eWeLink app)
     """
     DEFAULT_PORT = 8081
-    DEFAULT_TIMEOUT = 5
+    DEFAULT_TIMEOUT = 2
 
     """
     Initialise class with connection parameters
@@ -61,7 +62,7 @@ class SonoffLANModeClient:
             'ts': 0
         }
 
-    async def connect(self, timeout=3) -> None:
+    async def connect(self, connect_timeout=DEFAULT_TIMEOUT) -> None:
         """
         Connect to the Sonoff LAN Mode Device and set up handler for receiving messages.
         :return:
@@ -69,10 +70,19 @@ class SonoffLANModeClient:
         websocket_address = 'ws://%s:%s/' % (self.host, self.port)
         _LOGGER.debug('Connecting to websocket address: %s', websocket_address)
 
-        async with websockets.connect(websocket_address, timeout=timeout) as websocket:
-            self.websocket = websocket
-            response = await self.send(self.get_user_online_payload())
-            self.basic_device_info = response
+        try:
+            async with timeout(connect_timeout):
+                async with websockets.connect(websocket_address, timeout=connect_timeout, ping_timeout=connect_timeout,
+                                              close_timeout=connect_timeout) as websocket:
+                    self.websocket = websocket
+                    response = await self.send(self.get_user_online_payload())
+                    self.basic_device_info = response
+        except ConnectionRefusedError as ex:
+            _LOGGER.error("Connection failed: %s", ex, exc_info=False)
+            raise
+        except Exception as ex:
+            _LOGGER.error("Unexpected error during connection: %s" % ex)
+            raise
 
     async def send(self, request: Union[str, Dict]) -> Dict:
         """
@@ -82,7 +92,10 @@ class SonoffLANModeClient:
         :return:
         """
         if self.websocket is None:
-            await self.connect()
+            try:
+                await self.connect()
+            except Exception as ex:
+                raise
 
         if isinstance(request, dict):
             request = json.dumps(request)
@@ -102,7 +115,10 @@ class SonoffLANModeClient:
 
     async def get_basic_info(self) -> Dict:
         if self.websocket is None:
-            await self.connect()
+            try:
+                await self.connect()
+            except Exception as ex:
+                raise
 
         _LOGGER.debug('get_basic_info returning: %s', self.basic_device_info)
 
@@ -110,6 +126,9 @@ class SonoffLANModeClient:
 
     async def get_latest_params(self) -> Dict:
         if self.websocket is None:
-            await self.connect()
+            try:
+                await self.connect()
+            except Exception as ex:
+                raise
 
         return self.latest_params

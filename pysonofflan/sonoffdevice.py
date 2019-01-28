@@ -32,8 +32,7 @@ class SonoffDevice(object):
         self.context = context
         self.client = SonoffLANModeClient(host)
 
-    async def _update_helper(self,
-                       payload: Optional[Dict] = None) -> Any:
+    async def _update_helper(self, payload: Optional[Dict] = None) -> Any:
         """
         Helper returning unwrapped result object and doing error handling.
 
@@ -44,11 +43,9 @@ class SonoffDevice(object):
         """
 
         try:
-            response = self.client.send(
-                request=payload,
-            )
+            response = await self.client.send(request=payload)
         except Exception as ex:
-            raise SonoffDeviceException('Communication error') from ex
+            raise SonoffDeviceException('Unable to connect to Sonoff') from ex
 
         return response
 
@@ -60,7 +57,11 @@ class SonoffDevice(object):
         :rtype dict
         :raises SonoffDeviceException: on error
         """
-        return await self.client.get_basic_info()
+        try:
+            basic_info = await self.client.get_basic_info()
+        except Exception as ex:
+            raise SonoffDeviceException('Unable to connect to Sonoff') from ex
+        return basic_info
 
     @property
     async def device_id(self) -> str:
@@ -70,7 +71,12 @@ class SonoffDevice(object):
         :return: Device ID.
         :rtype: str
         """
-        return str((await self.get_basic_info())['deviceid'])
+        try:
+            basic_info = await self.get_basic_info()
+        except Exception as ex:
+            raise SonoffDeviceException('Unable to connect to Sonoff') from ex
+
+        return str(basic_info['deviceid'])
 
     async def turn_off(self) -> None:
         """

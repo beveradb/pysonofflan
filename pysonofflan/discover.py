@@ -39,7 +39,7 @@ class Discover:
                 if device_info is not None:
                     devices[ip] = device_info['deviceid']
         except Exception as ex:
-            _LOGGER.error("Got Exception %s", ex, exc_info=False)
+            _LOGGER.error("Caught Exception: %s" % ex, exc_info=False)
 
         return devices
 
@@ -57,7 +57,7 @@ class Discover:
 
         try:
             client = SonoffLANModeClient(host)
-            await client.connect(timeout=1)
+            await client.connect(connect_timeout=1)
             info = await client.get_basic_info()
         except ConnectionRefusedError as ex:
             _LOGGER.error("Got ConnectionRefusedError %s", ex, exc_info=False)
