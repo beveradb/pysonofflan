@@ -21,7 +21,6 @@ class SonoffDeviceException(Exception):
 class SonoffDevice(object):
     def __init__(self,
                  host: str,
-                 client: Optional[SonoffLANModeClient] = None,
                  context: str = None) -> None:
         """
         Create a new SonoffDevice instance.
@@ -30,12 +29,10 @@ class SonoffDevice(object):
         :param context: optional child ID for context in a parent device
         """
         self.host = host
-        if not client:
-            client = SonoffLANModeClient()
-        self.client = client
         self.context = context
+        self.client = SonoffLANModeClient(host)
 
-    def _update_helper(self,
+    async def _update_helper(self,
                        payload: Optional[Dict] = None) -> Any:
         """
         Helper returning unwrapped result object and doing error handling.
@@ -55,17 +52,7 @@ class SonoffDevice(object):
 
         return response
 
-    @property
-    def basic_info(self) -> Dict[str, Any]:
-        """
-        Returns basic information about this device - only the ID is really useful for now.
-
-        :return: Basic information dict.
-        :rtype: dict
-        """
-        return defaultdict(lambda: None, self.get_basic_info())
-
-    def get_basic_info(self) -> Dict:
+    async def get_basic_info(self) -> dict:
         """
         Retrieve basic information about this device - only the ID is really useful for now.
 
@@ -73,26 +60,26 @@ class SonoffDevice(object):
         :rtype dict
         :raises SonoffDeviceException: on error
         """
-        return self.client.get_basic_info()
+        return await self.client.get_basic_info()
 
     @property
-    def device_id(self) -> str:
+    async def device_id(self) -> str:
         """
         Get current device ID (immutable value based on hardware MAC address)
 
         :return: Device ID.
         :rtype: str
         """
-        return str(self.basic_info['device_id'])
+        return str((await self.get_basic_info()).device_id)
 
-    def turn_off(self) -> None:
+    async def turn_off(self) -> None:
         """
         Turns the device off.
         """
         raise NotImplementedError("Device subclass needs to implement this.")
 
     @property
-    def is_off(self) -> bool:
+    async def is_off(self) -> bool:
         """
         Returns whether device is off.
 
@@ -101,14 +88,14 @@ class SonoffDevice(object):
         """
         return not self.is_on
 
-    def turn_on(self) -> None:
+    async def turn_on(self) -> None:
         """
         Turns the device on.
         """
         raise NotImplementedError("Device subclass needs to implement this.")
 
     @property
-    def is_on(self) -> bool:
+    async def is_on(self) -> bool:
         """
         Returns whether the device is on.
 
@@ -118,19 +105,9 @@ class SonoffDevice(object):
         """
         raise NotImplementedError("Device subclass needs to implement this.")
 
-    @property
-    def state_information(self) -> Dict[str, Any]:
-        """
-        Returns device-type specific, end-user friendly state information.
-        :return: dict with state information.
-        :rtype: dict
-        """
-        raise NotImplementedError("Device subclass needs to implement this.")
-
     def __repr__(self):
-        return "<%s at %s (%s), is_on: %s - dev specific: %s>" % (
+        return "<%s at %s (%s), is_on: %s>" % (
             self.__class__.__name__,
             self.host,
             self.device_id,
-            self.is_on,
-            self.state_information)
+            self.is_on)

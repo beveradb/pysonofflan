@@ -2,7 +2,7 @@ import datetime
 import logging
 from typing import Any, Dict, Optional
 
-from pysonofflan import SonoffDevice, SonoffLANModeClient
+from pysonofflan import SonoffDevice
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -30,12 +30,11 @@ class SonoffSwitch(SonoffDevice):
 
     def __init__(self,
                  host: str,
-                 client: 'SonoffLANModeClient' = None,
                  context: str = None) -> None:
-        SonoffDevice.__init__(self, host, client, context)
+        SonoffDevice.__init__(self, host, context)
 
     @property
-    def state(self) -> str:
+    async def state(self) -> str:
         """
         Retrieve the switch state
 
@@ -56,7 +55,7 @@ class SonoffSwitch(SonoffDevice):
             return SonoffSwitch.SWITCH_STATE_UNKNOWN
 
     @state.setter
-    def state(self, value: str):
+    async def state(self, value: str):
         """
         Set the new switch state
 
@@ -77,15 +76,18 @@ class SonoffSwitch(SonoffDevice):
             raise ValueError("State %s is not valid.", value)
 
     @property
-    def is_on(self) -> bool:
+    async def is_on(self) -> bool:
         """
         Returns whether device is on.
 
         :return: True if device is on, False otherwise
         """
-        return self.basic_info['state'] == "on"
+        if 'switch' in self.client.latest_params:
+            return self.client.latest_params.switch == "on"
 
-    def turn_on(self):
+        return False
+
+    async def turn_on(self):
         """
         Turn the switch on.
 
@@ -93,7 +95,7 @@ class SonoffSwitch(SonoffDevice):
         """
         self._update_helper(self.client.get_update_payload(self.device_id, {"switch": "on"}))
 
-    def turn_off(self):
+    async def turn_off(self):
         """
         Turn the switch off.
 

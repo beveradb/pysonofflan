@@ -1,7 +1,8 @@
+import ipaddress
 import json
 import logging
 import socket
-from typing import Dict, Type
+from typing import Dict
 
 from pysonofflan import (SonoffLANModeClient)
 
@@ -10,70 +11,41 @@ _LOGGER = logging.getLogger(__name__)
 
 class Discover:
     @staticmethod
-    def discover(client: SonoffLANModeClient = None,
-                 port: int = 8081,
-                 timeout: int = 3) -> Dict[str, str]:
+    async def discover() -> Dict[str, str]:
         """
-        Sends discovery message to 255.255.255.255:8081 in order
-        to detect available supported devices in the local network,
-        and waits for given timeout for answers from devices.
+        Attempts websocket connection on port 8081 to all IP addresses on common home IP subnets:
+        192.168.0.X and 192.168.1.X, in the hope of detecting  available supported devices in the local network.
 
-        :param client: client implementation to use
-        :param timeout: How long to wait for responses, defaults to 5
-        :param port: port to send broadcast messages, defaults to 8081.
+        :param timeout: How long to wait for responses, defaults to 5 seconds
+        :param port: port to send attempt connections on, defaults to 8081.
         :rtype: dict
-        :return: Array of json objects {"ip", "port", "sys_info"}
+        :return: Array of devices {"ip": "device_id"}
         """
-        if client is None:
-            client = SonoffLANModeClient()
 
-        target = "255.255.255.255"
-
-        sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        sock.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
-        sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-        sock.settimeout(timeout)
-
-        user_online_payload = client.get_user_online_payload()
-        req = json.dumps(user_online_payload)
-        _LOGGER.debug("Sending discovery to %s:%s", target, port)
-
-        sock.sendto(bytes(req, "utf-8"), (target, port))
-
+        _LOGGER.debug("Attempting connection to all IPs on local network")
         devices = {}
-        _LOGGER.debug("Waiting %s seconds for responses...", timeout)
 
         try:
-            while True:
-                response, addr = sock.recvfrom(4096)
-                ip, port = addr
-                device_basic_info = json.loads(response)
-                device_id = device_basic_info.device_id
+            for ip in ipaddress.IPv4Network('192.168.0.0/23'):
+                device_id = await Discover.discover_single(ip)
                 if device_id is not None:
                     devices[ip] = device_id
-        except socket.timeout:
-            _LOGGER.debug("Got socket timeout, which is okay.")
         except Exception as ex:
             _LOGGER.error("Got exception %s", ex, exc_info=True)
         return devices
 
     @staticmethod
-    def discover_single(host: str,
-                        client: SonoffLANModeClient = None
-                        ) -> str:
+    async def discover_single(host: str) -> str:
         """
-        Similar to discover(), except only return device object for a single
-        host.
+        Attempt to connect to a single host, returning device ID if successful.
 
-        :param host: Hostname of device to query
-        :param client: client implementation to use
-        :rtype: SmartDevice
-        :return: Object for querying/controlling found device.
+        :param host: Hostname / IP address of device to query
+        :rtype: str
+        :return: Device ID of found device
         """
-        if client is None:
-            client = SonoffLANModeClient()
 
-        client.connect(host)
-        info = client.get_basic_info()
+        client = SonoffLANModeClient(host)
+        await client.connect()
+        info = await client.get_basic_info()
 
         return info.device_id

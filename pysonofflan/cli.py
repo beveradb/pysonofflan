@@ -1,7 +1,7 @@
+import asyncio
 import sys
 import click
 import logging
-from pprint import pformat as pf
 
 if sys.version_info < (3, 5):
     print("To use this script you need python 3.5 or newer! got %s" %
@@ -50,7 +50,7 @@ def cli(ctx, host, device_id, debug, switch):
     else:
         if not switch:
             click.echo("No --switch given, discovering..")
-            dev = Discover.discover_single(host)
+            dev = asyncio.get_event_loop().run_until_complete(Discover.discover_single(host))
         elif switch:
             dev = SonoffSwitch(host)
         else:
@@ -67,10 +67,10 @@ def cli(ctx, host, device_id, debug, switch):
 @click.option('--timeout', default=3, required=False)
 @click.option('--discover-only', default=False)
 @click.pass_context
-def discover(ctx, timeout, discover_only):
+async def discover(ctx, timeout, discover_only):
     """Discover devices in the network."""
     click.echo("Discovering devices for %s seconds" % timeout)
-    found_devs = Discover.discover(timeout=timeout).items()
+    found_devs = (await Discover.discover()).items()
     if not discover_only:
         for ip, dev in found_devs:
             ctx.obj = dev
@@ -80,13 +80,13 @@ def discover(ctx, timeout, discover_only):
     return found_devs
 
 
-def find_host_from_device_id(device_id, timeout=1, attempts=3):
+async def find_host_from_device_id(device_id, timeout=1, attempts=3):
     """Discover a device identified by its device_id"""
     click.echo("Trying to discover %s using %s attempts of %s seconds" %
                (device_id, attempts, timeout))
     for attempt in range(1, attempts):
         click.echo("Attempt %s of %s" % (attempt, attempts))
-        found_devs = Discover.discover(timeout=timeout).items()
+        found_devs = (await Discover.discover()).items()
         for host, found_device_id in found_devs:
             if found_device_id.lower() == device_id.lower():
                 return host
@@ -96,9 +96,9 @@ def find_host_from_device_id(device_id, timeout=1, attempts=3):
 @cli.command()
 @pass_dev
 @click.pass_context
-def state(ctx, dev):
+async def state(ctx, dev):
     """Print out device ID and state."""
-    click.echo(click.style("== %s ==" % dev.device_id, bold=True))
+    click.echo(click.style("== %s ==" % (await dev.device_id), bold=True))
 
     click.echo(click.style("Device state: %s" % "ON" if dev.is_on else "OFF",
                            fg="green" if dev.is_on else "red"))
@@ -108,7 +108,7 @@ def state(ctx, dev):
 @cli.command()
 @click.argument('index', type=int, required=False)
 @pass_dev
-def on(switch, index):
+async def on(switch, index):
     """Turn the device on."""
     click.echo("Turning on..")
     if index is None:
@@ -120,7 +120,7 @@ def on(switch, index):
 @cli.command()
 @click.argument('index', type=int, required=False)
 @pass_dev
-def off(switch, index):
+async def off(switch, index):
     """Turn the device off."""
     click.echo("Turning off..")
     if index is None:

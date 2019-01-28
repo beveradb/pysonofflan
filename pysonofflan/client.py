@@ -16,8 +16,19 @@ class SonoffLANModeClient:
     DEFAULT_PORT = 8081
     DEFAULT_TIMEOUT = 5
 
-    def __init__(self):
-        self.basic_device_info = None
+    """
+    Initialise class with connection parameters
+
+    :param str host: host name or ip address of the device
+    :param int port: port on the device (default: 8081)
+    :return:
+    """
+
+    def __init__(self, host: str, port: int = DEFAULT_PORT):
+        self.host = host
+        self.port = port
+        self.basic_device_info = {}
+        self.latest_params = {}
         self.websocket = None
 
     @staticmethod
@@ -50,25 +61,18 @@ class SonoffLANModeClient:
             'ts': 0
         }
 
-    async def connect(self, host: str, port: int = DEFAULT_PORT) -> None:
+    async def connect(self) -> None:
         """
-        Connect to a Sonoff LAN Mode Device and set up handler for receiving messages.
-
-        :param str host: host name or ip address of the device
-        :param int port: port on the device (default: 8081)
+        Connect to the Sonoff LAN Mode Device and set up handler for receiving messages.
         :return:
         """
-        async with websockets.connect('ws://%s:%s' % host, port) as websocket:
-            user_online_payload = self.get_user_online_payload()
+        websocket_address = 'ws://%s:%s/' % (self.host, self.port)
+        _LOGGER.debug('Connecting to websocket address: %s', websocket_address)
 
-            _LOGGER.debug('Sending user online websocket message: %s', json.dumps(user_online_payload))
-            await websocket.send(user_online_payload)
-
-            response = await websocket.recv()
-            _LOGGER.debug('Received websocket response: %s', response)
-            self.basic_device_info = json.loads(response)
-
+        async with websockets.connect(websocket_address) as websocket:
             self.websocket = websocket
+            response = self.send(self.get_user_online_payload())
+            self.basic_device_info = json.loads(response)
 
     async def send(self, request: Union[str, Dict]) -> Dict:
         """
@@ -77,18 +81,33 @@ class SonoffLANModeClient:
         :param request: command to send to the device (can be either dict or json string)
         :return:
         """
+        if self.websocket is None:
+            await self.connect()
+
         if isinstance(request, dict):
             request = json.dumps(request)
 
         _LOGGER.debug('Sending websocket message: %s', json.dumps(request))
-
         await self.websocket.send(request)
 
         response = await self.websocket.recv()
-
         _LOGGER.debug('Received websocket response: %s', response)
 
-        return json.loads(response)
+        response_data = json.loads(response)
 
-    def get_basic_info(self):
+        if 'params' in response_data:
+            self.latest_params = response_data.params
+
+        return response_data
+
+    async def get_basic_info(self) -> Dict:
+        if self.websocket is None:
+            await self.connect()
+
         return self.basic_device_info
+
+    async def get_latest_params(self) -> Dict:
+        if self.websocket is None:
+            await self.connect()
+
+        return self.latest_params
