@@ -18,7 +18,7 @@ class SonoffSwitch(SonoffDevice):
     # query and print current state of plug
     print(p.state)
 
-    Errors reported by the device are raised as SonoffDeviceExceptions,
+    Errors reported by the device are raised as Exceptions,
     and should be handled by the user of the library.
     """
     # switch states
@@ -42,7 +42,7 @@ class SonoffSwitch(SonoffDevice):
                   SWITCH_STATE_UNKNOWN
         :rtype: str
         """
-        state = (await self.get_basic_info())['state']
+        state = self.params['switch']
 
         if state == "off":
             return SonoffSwitch.SWITCH_STATE_OFF
@@ -61,7 +61,6 @@ class SonoffSwitch(SonoffDevice):
                     SWITCH_STATE_ON
                     SWITCH_STATE_OFF
         :raises ValueError: on invalid state
-        :raises SonoffDeviceException: on error
 
         """
         if not isinstance(value, str):
@@ -88,12 +87,10 @@ class SonoffSwitch(SonoffDevice):
     async def turn_on(self):
         """
         Turn the switch on.
-
-        :raises SonoffDeviceException: on error
         """
-        await self._update_helper(
+        await self.client.send(
             self.client.get_update_payload(
-                await self.device_id,
+                self.device_id,
                 {"switch": "on"}
             )
         )
@@ -101,12 +98,10 @@ class SonoffSwitch(SonoffDevice):
     async def turn_off(self):
         """
         Turn the switch off.
-
-        :raises SonoffDeviceException: on error
         """
-        await self._update_helper(
+        await self.client.send(
             self.client.get_update_payload(
-                await self.device_id,
+                self.device_id,
                 {"switch": "off"}
             )
         )

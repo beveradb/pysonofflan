@@ -1,3 +1,4 @@
+import asyncio
 import json
 import logging
 import random
@@ -5,7 +6,6 @@ import time
 from typing import Dict, Union
 
 import websockets
-from async_timeout import timeout
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -15,7 +15,7 @@ class SonoffLANModeClient:
     Implementation of the Sonoff LAN Mode Protocol (as used by the eWeLink app)
     """
     DEFAULT_PORT = 8081
-    DEFAULT_TIMEOUT = 2
+    DEFAULT_TIMEOUT = 20
 
     """
     Initialise class with connection parameters
@@ -28,9 +28,96 @@ class SonoffLANModeClient:
     def __init__(self, host: str, port: int = DEFAULT_PORT):
         self.host = host
         self.port = port
-        self.basic_device_info = {}
-        self.latest_params = {}
         self.websocket = None
+
+    @asyncio.coroutine
+    def connect(self, event_handler) -> None:
+        """
+        Connect to the Sonoff LAN Mode Device and set up communication channel.
+        """
+        websocket_address = 'ws://%s:%s/' % (self.host, self.port)
+        _LOGGER.debug('Connecting to websocket address: %s', websocket_address)
+
+        self.websocket = yield from websockets.connect(websocket_address)
+        yield from self._send_online_message(self.websocket, event_handler)
+        yield from self._start_loop(self.websocket, event_handler)
+
+    @asyncio.coroutine
+    def _start_loop(self, websocket, event_handler):
+        """
+        We will listen for websockets events, sending a ping/pong every time
+        we react to a TimeoutError. If we don't, the webserver would close the
+        idle connection, forcing us to reconnect.
+        """
+        _LOGGER.debug('Starting websocket loop')
+        while True:
+            try:
+                yield from asyncio.wait_for(
+                    self._wait_for_message(websocket, event_handler),
+                    timeout=self.DEFAULT_TIMEOUT
+                )
+            except asyncio.TimeoutError:
+                yield from websocket.pong()
+                _LOGGER.debug("Sending heartbeat...")
+                continue
+
+    @asyncio.coroutine
+    def _send_online_message(self, websocket, event_handler):
+        """
+        Sends the user online message over the websocket.
+        """
+        _LOGGER.debug('Sending user online message over websocket')
+
+        json_data = json.dumps(self.get_user_online_payload()).encode('utf8')
+        yield from websocket.send(json_data)
+
+        while True:
+            response_message = yield from websocket.recv()
+            response = json.loads(response_message)
+
+            _LOGGER.debug('Received user online response:')
+            _LOGGER.debug(response)
+            # Example user online response:
+            # {
+            #     "error": 0,
+            #     "apikey": "ab22d7b3-53de-44b9-ad26-f1ff260e8f1d",
+            #     "sequence": "15483706231915703",
+            #     "deviceid": "100040e943"
+            # }
+
+            # We want to pass the event to the event_handler already
+            # because the hello event could arrive before the user online
+            # confirmation response
+            yield from event_handler(response_message)
+
+            if ('error' in response and response['error'] == 0) \
+                and 'deviceid' in response:
+                _LOGGER.info('Websocket connected and accepted online user OK')
+                return True
+            else:
+                _LOGGER.error('Websocket connection online user failed')
+
+    @asyncio.coroutine
+    def _wait_for_message(self, websocket, event_handler):
+        _LOGGER.debug('Waiting for messages on websocket')
+        while True:
+            message = yield from websocket.recv()
+            yield from event_handler(message)
+
+    @asyncio.coroutine
+    def send(self, request: Union[str, Dict]):
+        """
+        Send message to an already-connected Sonoff LAN Mode Device
+        and return the response.
+
+        :param request: command to send to the device (can be dict or json)
+        :return:
+        """
+        if isinstance(request, dict):
+            request = json.dumps(request).encode('utf8')
+
+        _LOGGER.debug('Sending websocket message: %s', request)
+        yield from self.websocket.send(request)
 
     @staticmethod
     def get_user_online_payload() -> Dict:
@@ -61,70 +148,3 @@ class SonoffLANModeClient:
             'controlType': 4,
             'ts': 0
         }
-
-    async def connect(self, connect_timeout=DEFAULT_TIMEOUT) -> None:
-        """
-        Connect to the Sonoff LAN Mode Device and set up communication channel.
-        :return:
-        """
-        websocket_address = 'ws://%s:%s/' % (self.host, self.port)
-        _LOGGER.debug('Connecting to websocket address: %s', websocket_address)
-
-        try:
-            async with timeout(connect_timeout):
-                async with websockets.connect(
-                    websocket_address,
-                    timeout=connect_timeout,
-                    ping_timeout=connect_timeout,
-                    close_timeout=connect_timeout
-                ) as websocket:
-                    self.websocket = websocket
-                    response = await self.send(self.get_user_online_payload())
-                    self.basic_device_info = response
-        except ConnectionRefusedError as ex:
-            _LOGGER.error("Connection failed: %s", ex, exc_info=False)
-            raise
-        except Exception as ex:
-            _LOGGER.error("Unexpected error during connection: %s" % ex)
-            raise
-
-    async def send(self, request: Union[str, Dict]) -> Dict:
-        """
-        Send message to an already-connected Sonoff LAN Mode Device
-        and return the response.
-
-        :param request: command to send to the device (can be dict or json)
-        :return:
-        """
-        if self.websocket is None:
-            await self.connect()
-
-        if isinstance(request, dict):
-            request = json.dumps(request)
-
-        _LOGGER.debug('Sending websocket message: %s', json.dumps(request))
-        await self.websocket.send(request)
-
-        response = await self.websocket.recv()
-        _LOGGER.debug('Received websocket response: %s', response)
-
-        response_data = json.loads(response)
-
-        if 'params' in response_data:
-            self.latest_params = response_data.params
-
-        return response_data
-
-    async def get_basic_info(self) -> Dict:
-        if self.websocket is None:
-            await self.connect()
-
-        _LOGGER.debug('get_basic_info returning: %s', self.basic_device_info)
-
-        return self.basic_device_info
-
-    async def get_latest_params(self) -> Dict:
-        if self.websocket is None:
-            await self.connect()
-
-        return self.latest_params

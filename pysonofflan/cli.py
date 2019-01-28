@@ -93,9 +93,7 @@ def state(device: SonoffSwitch):
     """Print out device ID and state."""
 
     try:
-        device_id = asyncio.get_event_loop().run_until_complete(
-            device.device_id
-        )
+        device_id = device.device_id
     except Exception as ex:
         click.echo("Error getting device ID: %s" % ex)
         return None

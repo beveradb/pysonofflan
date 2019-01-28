@@ -30,7 +30,7 @@ All common, shared functionality is available through `SonoffDevice` class:
 
 For device type specific actions `SonoffSwitch` must be used instead.
 
-Module-specific errors are raised as `SonoffDeviceException` and are expected
+Module-specific errors are raised as Exceptions and are expected
 to be handled by the user of the library.
 """
 
@@ -41,5 +41,5 @@ __version__ = '0.1.0'
 # flake8: noqa
 from .client import SonoffLANModeClient
 from .discover import Discover
-from .sonoffdevice import SonoffDevice, SonoffDeviceException
+from .sonoffdevice import SonoffDevice
 from .sonoffswitch import SonoffSwitch

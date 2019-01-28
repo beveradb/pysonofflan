@@ -2,19 +2,13 @@
 pysonofflan
 Python library supporting Sonoff Smart Devices (Basic/S20/Touch) in LAN Mode.
 """
+import asyncio
+import json
 import logging
-from typing import Any, Dict, Optional
 
 from .client import SonoffLANModeClient
 
 _LOGGER = logging.getLogger(__name__)
-
-
-class SonoffDeviceException(Exception):
-    """
-    SonoffDeviceException gets raised for errors reported by device.
-    """
-    pass
 
 
 class SonoffDevice(object):
@@ -30,54 +24,41 @@ class SonoffDevice(object):
         self.host = host
         self.context = context
         self.client = SonoffLANModeClient(host)
+        self.basic_info = None
+        self.params = None
 
-    async def _update_helper(self, payload: Optional[Dict] = None) -> Any:
+        _LOGGER.info('Calling connect in SonoffLANModeClient with handler')
+        asyncio.get_event_loop().run_until_complete(
+            self.client.connect(self.handle_message)
+        )
+
+    def handle_message(self, message):
         """
-        Helper returning unwrapped result object and doing error handling.
-
-        :param payload: JSON object passed as message to the device
-        :return: Unwrapped result for the call.
-        :rtype: dict
-        :raises SonoffDeviceException: if command was not executed correctly
+        Receive message sent by the device and handle it, either updating
+        state or storing basic device info
         """
+        response = json.loads(message)
 
-        _LOGGER.debug("Sending update payload to device: %s", payload)
-        try:
-            response = await self.client.send(request=payload)
-        except Exception as ex:
-            raise SonoffDeviceException('Unable to connect to Sonoff') from ex
-
-        return response
-
-    async def get_basic_info(self) -> dict:
-        """
-        Retrieve basic information about this device - only ID is really
-        useful for now.
-
-        :return: basic_info
-        :rtype dict
-        :raises SonoffDeviceException: on error
-        """
-        try:
-            basic_info = await self.client.get_basic_info()
-        except Exception as ex:
-            raise SonoffDeviceException('Unable to connect to Sonoff') from ex
-        return basic_info
+        if ('error' in response and response['error'] == 0) \
+            and 'deviceid' in response:
+            _LOGGER.info('Received basic device info, storing in instance')
+            self.basic_info = response
+        elif 'action' in response and response['action'] == "update":
+            _LOGGER.info('Received update action, updating internal state')
+            self.params = response['params']
+        else:
+            _LOGGER.error('Unknown message received from device: ' % message)
+            raise Exception('Unknown message received from device')
 
     @property
-    async def device_id(self) -> str:
+    def device_id(self) -> str:
         """
         Get current device ID (immutable value based on hardware MAC address)
 
         :return: Device ID.
         :rtype: str
         """
-        try:
-            basic_info = await self.get_basic_info()
-        except Exception as ex:
-            raise SonoffDeviceException('Unable to connect to Sonoff') from ex
-
-        return str(basic_info['deviceid'])
+        return self.basic_info['deviceid']
 
     async def turn_off(self) -> None:
         """
