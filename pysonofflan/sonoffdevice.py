@@ -5,6 +5,9 @@ Python library supporting Sonoff Smart Devices (Basic/S20/Touch) in LAN Mode.
 import asyncio
 import json
 import logging
+import sys
+
+import websockets
 
 from .client import SonoffLANModeClient
 
@@ -15,6 +18,8 @@ class SonoffDevice(object):
     def __init__(self,
                  host: str,
                  end_after_first_update: bool = False,
+                 ping_interval=SonoffLANModeClient.DEFAULT_PING_INTERVAL,
+                 timeout=SonoffLANModeClient.DEFAULT_TIMEOUT,
                  context: str = None) -> None:
         """
         Create a new SonoffDevice instance.
@@ -26,33 +31,84 @@ class SonoffDevice(object):
         self.context = context
         self.basic_info = None
         self.params = None
+        self.params_updated = False
         self.end_after_first_update = end_after_first_update
 
-        _LOGGER.debug('Calling connect in SonoffLANModeClient with handler')
-        self.client = SonoffLANModeClient(host, self.handle_message)
+        _LOGGER.debug('Initializing SonoffLANModeClient class in SonoffDevice')
+        self.client = SonoffLANModeClient(
+            host,
+            self.handle_message,
+            ping_interval=ping_interval,
+            timeout=timeout
+        )
 
         try:
             self.loop = asyncio.new_event_loop()
-            self.loop.run_until_complete(self.client.connect())
-            self.loop.run_forever()
+            asyncio.set_event_loop(self.loop)
+
+            self.loop.run_until_complete(
+                asyncio.gather(
+                    self.setup_connection(),
+                    self.send_updated_params_loop()
+                )
+            )
         except asyncio.CancelledError:
             _LOGGER.debug('SonoffDevice loop ended, returning')
 
-    @asyncio.coroutine
-    def update_params(self, params):
-        update_message = self.client.get_update_payload(
-            self.device_id,
-            params
-        )
+    async def setup_connection(self):
+        _LOGGER.debug('setup_connection is active on the event loop')
 
+        try:
+            _LOGGER.debug('setup_connection yielding to connect()')
+            await self.client.connect()
+            _LOGGER.debug('setup_connection yielding to send_online_message()')
+            await self.client.send_online_message()
+            _LOGGER.debug(
+                'setup_connection yielding to receive_message_loop()')
+            await self.client.receive_message_loop()
+        except ConnectionRefusedError:
+            _LOGGER.error('Unable to connect: connection refused')
+            self.shutdown_event_loop()
+        except websockets.exceptions.ConnectionClosed:
+            _LOGGER.error('Connection closed unexpectedly')
+            self.shutdown_event_loop()
+        finally:
+            _LOGGER.debug('finally: closing websocket from setup_connection '
+                          '(NOPE)')
+            # await self.client.close_connection()
+
+        _LOGGER.debug('setup_connection resumed, exiting')
+
+    async def send_updated_params_loop(self):
+        _LOGGER.debug('send_updated_params_loop is active on the event loop')
+
+        try:
+            _LOGGER.debug('Starting loop waiting for device params to change')
+            while self.client.keep_running:
+                # TODO: replace with "async with" event-based action
+                if self.params_updated:
+                    update_message = self.client.get_update_payload(
+                        self.device_id,
+                        self.params
+                    )
+                    await self.client.send(update_message)
+                    self.params_updated = False
+                    _LOGGER.debug('Update message sent, should loop now')
+        finally:
+            _LOGGER.debug('send_updated_params_loop finally block reached: '
+                          'closing websocket (NOPE)')
+            # await self.client.close_connection()
+
+        _LOGGER.debug('send_updated_params_loop resumed outside loop, exiting')
+
+    async def update_params(self, params):
         _LOGGER.info(
-            'Sending params update message to device: %s' % update_message
+            'Scheduling params update message to device: %s' % params
         )
+        self.params = params
+        self.params_updated = True
 
-        yield from self.client.send(update_message)
-
-    @asyncio.coroutine
-    def handle_message(self, message):
+    async def handle_message(self, message):
         """
         Receive message sent by the device and handle it, either updating
         state or storing basic device info
@@ -64,19 +120,19 @@ class SonoffDevice(object):
             _LOGGER.debug('Received basic device info, storing in instance')
             self.basic_info = response
         elif 'action' in response and response['action'] == "update":
-            _LOGGER.debug(
+            _LOGGER.info(
                 'Received update action, updating internal params state to: %s'
                 % response['params'])
             self.params = response['params']
 
             if self.end_after_first_update:
                 _LOGGER.debug('Gracefully stopping message receive loop')
-                self.shutdown_loop()
+                self.shutdown_event_loop()
         else:
             _LOGGER.error('Unknown message received from device: ' % message)
             raise Exception('Unknown message received from device')
 
-    def shutdown_loop(self):
+    def shutdown_event_loop(self):
         self.client.keep_running = False
 
         try:
@@ -102,10 +158,12 @@ class SonoffDevice(object):
 
             # Keep the event loop running until it is either
             # destroyed or all tasks have really terminated
-            while not tasks.done() and not self.loop.is_closed():
+            while not tasks.done() and not self.loop.is_closed() and not \
+                self.loop.is_running():
                 self.loop.run_forever()
         finally:
-            if hasattr(self.loop, "shutdown_asyncgens"):  # Python 3.5
+            if hasattr(self.loop, "shutdown_asyncgens") and \
+                not self.loop.is_running():  # Python 3.5
                 self.loop.run_until_complete(
                     self.loop.shutdown_asyncgens()
                 )

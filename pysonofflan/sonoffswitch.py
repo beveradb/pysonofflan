@@ -1,6 +1,6 @@
 import logging
 
-from pysonofflan import SonoffDevice
+from pysonofflan import SonoffDevice, SonoffLANModeClient
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -29,8 +29,18 @@ class SonoffSwitch(SonoffDevice):
     def __init__(self,
                  host: str,
                  end_after_first_update: bool = False,
+                 ping_interval=SonoffLANModeClient.DEFAULT_PING_INTERVAL,
+                 timeout=SonoffLANModeClient.DEFAULT_TIMEOUT,
                  context: str = None) -> None:
-        SonoffDevice.__init__(self, host, end_after_first_update, context)
+
+        SonoffDevice.__init__(
+            self,
+            host=host,
+            end_after_first_update=end_after_first_update,
+            ping_interval=ping_interval,
+            timeout=timeout,
+            context=context
+        )
 
     @property
     async def state(self) -> str:

@@ -92,15 +92,16 @@ def state(host: str):
 
 
 def print_device_details(device):
-    device_id = device.device_id
+    if device.basic_info is not None:
+        device_id = device.device_id
 
-    click.echo(
-        click.style("== Device: %s ==" % device_id, bold=True)
-    )
+        click.echo(
+            click.style("== Device: %s ==" % device_id, bold=True)
+        )
 
-    click.echo("State: " + click.style("ON" if device.is_on else "OFF",
-                                       fg="green" if device.is_on else "red"))
-    click.echo("Host/IP: %s" % device.host)
+        click.echo("State: " + click.style("ON" if device.is_on else "OFF",
+                                           fg="green" if device.is_on else "red"))
+        click.echo("Host/IP: %s" % device.host)
 
 
 @cli.command()
@@ -108,11 +109,16 @@ def print_device_details(device):
 def on(host: str):
     """Turn the device on."""
     click.echo("Initialising SonoffSwitch with host %s" % host)
-    device = SonoffSwitch(host)
-    print_device_details(device)
+    device = SonoffSwitch(host, ping_interval=60)
 
-    click.echo("Turning on...")
-    device.turn_on()
+    if device.basic_info is not None:
+        print_device_details(device)
+
+        click.echo("Turning on...")
+        device.turn_on()
+
+        click.echo("Closing connection...")
+        device.shutdown_event_loop()
 
 
 @cli.command()
@@ -121,10 +127,12 @@ def off(host: str):
     """Turn the device off."""
     click.echo("Initialising SonoffSwitch with host %s" % host)
     device = SonoffSwitch(host)
-    print_device_details(device)
 
-    click.echo("Turning off...")
-    device.turn_off()
+    if device.basic_info is not None:
+        print_device_details(device)
+
+        click.echo("Turning off...")
+        device.turn_off()
 
 
 if __name__ == "__main__":
