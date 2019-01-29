@@ -1,13 +1,60 @@
 import asyncio
+import binascii
 import json
 import logging
 import random
+import sys
 import time
-from typing import Dict, Union
+from typing import Dict, Union, Callable, Awaitable
 
 import websockets
+from websockets.framing import OP_CLOSE, parse_close, OP_PING, OP_PONG
 
 _LOGGER = logging.getLogger(__name__)
+
+
+class SonoffLANModeClientProtocol(websockets.WebSocketClientProtocol):
+    """WebSocket client protocol which ignores pong payload."""
+
+    @asyncio.coroutine
+    def read_data_frame(self, max_size):
+        """
+        Copied from WebSocketCommonProtocol to change pong handling
+        """
+        # 6.2. Receiving Data
+        while True:
+            frame = yield from self.read_frame(max_size)
+
+            if frame.opcode == OP_CLOSE:
+                self.close_code, self.close_reason = parse_close(frame.data)
+                yield from self.write_close_frame(frame.data)
+                return
+
+            elif frame.opcode == OP_PING:
+                ping_hex = binascii.hexlify(frame.data).decode() or '[empty]'
+                _LOGGER.debug(
+                    "%s - received ping, sending pong: %s", self.side, ping_hex
+                )
+                yield from self.pong(frame.data)
+
+            elif frame.opcode == OP_PONG:
+                # Acknowledge pings on solicited pongs, regardless of payload
+                if self.pings:
+                    ping_id, pong_waiter = self.pings.popitem(0)
+                    ping_hex = binascii.hexlify(ping_id).decode() or '[empty]'
+                    pong_waiter.set_result(None)
+                    _LOGGER.debug(
+                        "%s - received pong, clearing most recent ping: %s",
+                        self.side,
+                        ping_hex
+                    )
+                else:
+                    _LOGGER.debug(
+                        "%s - received pong, but no pings to clear",
+                        self.side
+                    )
+            else:
+                return frame
 
 
 class SonoffLANModeClient:
@@ -15,7 +62,7 @@ class SonoffLANModeClient:
     Implementation of the Sonoff LAN Mode Protocol (as used by the eWeLink app)
     """
     DEFAULT_PORT = 8081
-    DEFAULT_TIMEOUT = 20
+    DEFAULT_TIMEOUT = 10
 
     """
     Initialise class with connection parameters
@@ -25,77 +72,86 @@ class SonoffLANModeClient:
     :return:
     """
 
-    def __init__(self, host: str, port: int = DEFAULT_PORT):
+    def __init__(self, host: str,
+                 event_handler: Callable[[str], Awaitable[None]],
+                 port: int = DEFAULT_PORT):
         self.host = host
         self.port = port
         self.websocket = None
+        self.keep_running = True
+        self.event_handler = event_handler
 
     @asyncio.coroutine
-    def connect(self, event_handler) -> None:
+    def connect(self):
         """
         Connect to the Sonoff LAN Mode Device and set up communication channel.
         """
         websocket_address = 'ws://%s:%s/' % (self.host, self.port)
         _LOGGER.debug('Connecting to websocket address: %s', websocket_address)
 
-        self.websocket = yield from websockets.connect(websocket_address)
-        yield from self._send_online_message(self.websocket, event_handler)
-        yield from self._start_loop(self.websocket, event_handler)
+        self.websocket = yield from websockets.connect(
+            websocket_address,
+            ping_interval=5,
+            ping_timeout=10,
+            subprotocols=['chat'],
+            klass=SonoffLANModeClientProtocol
+        )
+
+        try:
+            yield from self._send_online_message()
+            yield from self._start_loop()
+        finally:
+            _LOGGER.debug('Closing websocket from connect finally block')
+            yield from self.websocket.close()
 
     @asyncio.coroutine
-    def _start_loop(self, websocket, event_handler):
+    def _start_loop(self):
         """
         We will listen for websockets events, sending a ping/pong every time
         we react to a TimeoutError. If we don't, the webserver would close the
         idle connection, forcing us to reconnect.
         """
         _LOGGER.debug('Starting websocket loop')
-        while True:
-            try:
-                yield from asyncio.wait_for(
-                    self._wait_for_message(websocket, event_handler),
-                    timeout=self.DEFAULT_TIMEOUT
-                )
-            except asyncio.TimeoutError:
-                yield from websocket.pong()
-                _LOGGER.debug("Sending heartbeat...")
-                continue
+        while self.keep_running:
+            yield from self._wait_for_message(
+                self.websocket,
+                self.event_handler
+            )
 
     @asyncio.coroutine
-    def _send_online_message(self, websocket, event_handler):
+    def _send_online_message(self):
         """
         Sends the user online message over the websocket.
         """
         _LOGGER.debug('Sending user online message over websocket')
 
-        json_data = json.dumps(self.get_user_online_payload()).encode('utf8')
-        yield from websocket.send(json_data)
+        json_data = json.dumps(self.get_user_online_payload())
+        yield from self.websocket.send(json_data)
 
-        while True:
-            response_message = yield from websocket.recv()
-            response = json.loads(response_message)
+        response_message = yield from self.websocket.recv()
+        response = json.loads(response_message)
 
-            _LOGGER.debug('Received user online response:')
-            _LOGGER.debug(response)
-            # Example user online response:
-            # {
-            #     "error": 0,
-            #     "apikey": "ab22d7b3-53de-44b9-ad26-f1ff260e8f1d",
-            #     "sequence": "15483706231915703",
-            #     "deviceid": "100040e943"
-            # }
+        _LOGGER.debug('Received user online response:')
+        _LOGGER.debug(response)
+        # Example user online response:
+        # {
+        #     "error": 0,
+        #     "apikey": "ab22d7b3-53de-44b9-ad26-f1ff260e8f1d",
+        #     "sequence": "15483706231915703",
+        #     "deviceid": "100040e943"
+        # }
 
-            # We want to pass the event to the event_handler already
-            # because the hello event could arrive before the user online
-            # confirmation response
-            yield from event_handler(response_message)
+        # We want to pass the event to the event_handler already
+        # because the hello event could arrive before the user online
+        # confirmation response
+        yield from self.event_handler(response_message)
 
-            if ('error' in response and response['error'] == 0) \
-                and 'deviceid' in response:
-                _LOGGER.info('Websocket connected and accepted online user OK')
-                return True
-            else:
-                _LOGGER.error('Websocket connection online user failed')
+        if ('error' in response and response['error'] == 0) \
+            and 'deviceid' in response:
+            _LOGGER.info('Websocket connected and accepted online user OK')
+            return True
+        else:
+            _LOGGER.error('Websocket connection online user failed')
 
     @asyncio.coroutine
     def _wait_for_message(self, websocket, event_handler):
@@ -148,3 +204,26 @@ class SonoffLANModeClient:
             'controlType': 4,
             'ts': 0
         }
+
+
+# Uncomment the below to test execution of this websocket client directly
+
+logging.basicConfig(level=logging.DEBUG)  # Shows debug logs from websocket
+_LOGGER.setLevel(logging.DEBUG)
+handler = logging.StreamHandler(sys.stdout)
+handler.setLevel(logging.DEBUG)
+formatter = logging.Formatter(
+    '%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+handler.setFormatter(formatter)
+_LOGGER.addHandler(handler)
+
+
+async def print_event_handler(message: str):
+    print("CALLBACK SUCCESS! Message: %s" % message)
+
+
+client = SonoffLANModeClient('127.0.0.1', print_event_handler)
+# client = SonoffLANModeClient('192.168.0.76', print_event_handler)
+
+asyncio.get_event_loop().run_until_complete(client.connect())
+asyncio.get_event_loop().run_forever()

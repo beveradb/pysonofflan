@@ -31,6 +31,7 @@ class SonoffDevice(object):
         asyncio.get_event_loop().run_until_complete(
             self.client.connect(self.handle_message)
         )
+        asyncio.get_event_loop().run_forever()
 
     def handle_message(self, message):
         """

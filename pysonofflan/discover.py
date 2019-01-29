@@ -1,5 +1,6 @@
 import ipaddress
 import logging
+import socket
 from itertools import chain
 from typing import Dict, Optional
 
@@ -20,7 +21,8 @@ class Discover:
         :return: Array of devices {"ip": "device_id"}
         """
 
-        _LOGGER.debug("Attempting connection to all IPs on local network")
+        _LOGGER.debug("Attempting connection to all IPs on local network. "
+                      "This will take approximately 1 minute, please wait...")
         devices = {}
 
         try:
@@ -32,31 +34,13 @@ class Discover:
 
             for ip in local_ip_ranges:
                 _LOGGER.debug("Attempting connection to IP: %s" % ip)
-                device_info = await Discover.discover_single(ip)
-                if device_info is not None:
-                    devices[ip] = device_info['deviceid']
+                sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+                sock.settimeout(0.1)
+                result = sock.connect_ex((str(ip), 8081))
+                if result == 0:
+                    _LOGGER.info("Found open 8081 port at local IP: %s" % ip)
+                    devices[ip] = ip
         except Exception as ex:
             _LOGGER.error("Caught Exception: %s" % ex, exc_info=False)
 
         return devices
-
-    @staticmethod
-    async def discover_single(host: str) -> Optional[dict]:
-        """
-        Attempt to connect to a single host, returning device ID if successful.
-
-        :param host: Hostname / IP address of device to query
-        :rtype: str
-        :return: Device ID of found device
-        """
-
-        info = None
-
-        try:
-            client = SonoffLANModeClient(host)
-            await client.connect(connect_timeout=1)
-            info = await client.get_basic_info()
-        except ConnectionRefusedError as ex:
-            _LOGGER.error("Got ConnectionRefusedError %s", ex, exc_info=False)
-
-        return info
