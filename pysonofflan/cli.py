@@ -111,7 +111,7 @@ def on(host: str):
     device = SonoffSwitch(host)
     print_device_details(device)
 
-    click.echo("Turning on..")
+    click.echo("Turning on...")
     device.turn_on()
 
 
@@ -123,7 +123,7 @@ def off(host: str):
     device = SonoffSwitch(host)
     print_device_details(device)
 
-    click.echo("Turning off..")
+    click.echo("Turning off...")
     device.turn_off()
 
 

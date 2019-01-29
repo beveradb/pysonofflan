@@ -89,27 +89,11 @@ class SonoffSwitch(SonoffDevice):
         Turn the switch on.
         """
         _LOGGER.info("Switch turn_on called.")
-
-        self.loop.run_until_complete(
-            self.client.send(
-                self.client.get_update_payload(
-                    self.device_id,
-                    {"switch": "on"}
-                )
-            )
-        )
+        self.update_params({"switch": "on"})
 
     def turn_off(self):
         """
         Turn the switch off.
         """
         _LOGGER.info("Switch turn_off called.")
-
-        self.loop.run_until_complete(
-            self.client.send(
-                self.client.get_update_payload(
-                    self.device_id,
-                    {"switch": "off"}
-                )
-            )
-        )
+        self.update_params({"switch": "off"})

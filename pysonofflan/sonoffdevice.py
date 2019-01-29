@@ -39,6 +39,19 @@ class SonoffDevice(object):
             _LOGGER.debug('SonoffDevice loop ended, returning')
 
     @asyncio.coroutine
+    def update_params(self, params):
+        update_message = self.client.get_update_payload(
+            self.device_id,
+            params
+        )
+
+        _LOGGER.info(
+            'Sending params update message to device: %s' % update_message
+        )
+
+        yield from self.client.send(update_message)
+
+    @asyncio.coroutine
     def handle_message(self, message):
         """
         Receive message sent by the device and handle it, either updating
