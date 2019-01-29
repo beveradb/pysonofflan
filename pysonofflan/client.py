@@ -3,7 +3,6 @@ import binascii
 import json
 import logging
 import random
-import sys
 import time
 from typing import Dict, Union, Callable, Awaitable
 
@@ -105,18 +104,26 @@ class SonoffLANModeClient:
             yield from self.websocket.close()
 
     @asyncio.coroutine
+    def close_connection(self):
+        _LOGGER.debug('Closing websocket from close_connection')
+        yield from self.websocket.close()
+
+    @asyncio.coroutine
     def _start_loop(self):
         """
         We will listen for websockets events, sending a ping/pong every time
         we react to a TimeoutError. If we don't, the webserver would close the
         idle connection, forcing us to reconnect.
         """
-        _LOGGER.debug('Starting websocket loop')
         while self.keep_running:
-            yield from self._wait_for_message(
-                self.websocket,
-                self.event_handler
-            )
+            _LOGGER.debug('Starting websocket client wait for message loop')
+            try:
+                yield from self._wait_for_message(
+                    self.websocket,
+                    self.event_handler
+                )
+            finally:
+                yield from self.websocket.close()
 
     @asyncio.coroutine
     def _send_online_message(self):
@@ -148,17 +155,20 @@ class SonoffLANModeClient:
 
         if ('error' in response and response['error'] == 0) \
             and 'deviceid' in response:
-            _LOGGER.info('Websocket connected and accepted online user OK')
+            _LOGGER.debug('Websocket connected and accepted online user OK')
             return True
         else:
             _LOGGER.error('Websocket connection online user failed')
 
     @asyncio.coroutine
     def _wait_for_message(self, websocket, event_handler):
-        _LOGGER.debug('Waiting for messages on websocket')
-        while True:
-            message = yield from websocket.recv()
-            yield from event_handler(message)
+        try:
+            while self.keep_running:
+                _LOGGER.debug('Waiting for messages on websocket')
+                message = yield from websocket.recv()
+                yield from event_handler(message)
+        finally:
+            yield from self.websocket.close()
 
     @asyncio.coroutine
     def send(self, request: Union[str, Dict]):
@@ -205,25 +215,20 @@ class SonoffLANModeClient:
             'ts': 0
         }
 
+# Uncomment the below to test this websocket client directly on CLI
 
-# Uncomment the below to test execution of this websocket client directly
-
-logging.basicConfig(level=logging.DEBUG)  # Shows debug logs from websocket
-_LOGGER.setLevel(logging.DEBUG)
-handler = logging.StreamHandler(sys.stdout)
-handler.setLevel(logging.DEBUG)
-formatter = logging.Formatter(
-    '%(asctime)s - %(name)s - %(levelname)s - %(message)s')
-handler.setFormatter(formatter)
-_LOGGER.addHandler(handler)
-
-
-async def print_event_handler(message: str):
-    print("CALLBACK SUCCESS! Message: %s" % message)
-
-
-client = SonoffLANModeClient('127.0.0.1', print_event_handler)
-# client = SonoffLANModeClient('192.168.0.76', print_event_handler)
-
-asyncio.get_event_loop().run_until_complete(client.connect())
-asyncio.get_event_loop().run_forever()
+# async def print_event_handler(message: str):
+#     print("CALLBACK SUCCESS! Message: %s" % message)
+#
+# logging.basicConfig(level=logging.DEBUG)  # Shows debug logs from websocket
+# _LOGGER.setLevel(logging.DEBUG)
+# handler = logging.StreamHandler(sys.stdout)
+# handler.setLevel(logging.DEBUG)
+# formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
+# handler.setFormatter(formatter)
+# _LOGGER.addHandler(handler)
+# client = SonoffLANModeClient('127.0.0.1', print_event_handler)
+# # client = SonoffLANModeClient('192.168.0.76', print_event_handler)
+#
+# asyncio.get_event_loop().run_until_complete(client.connect())
+# asyncio.get_event_loop().run_forever()

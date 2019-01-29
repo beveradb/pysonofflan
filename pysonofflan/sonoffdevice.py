@@ -14,6 +14,7 @@ _LOGGER = logging.getLogger(__name__)
 class SonoffDevice(object):
     def __init__(self,
                  host: str,
+                 end_after_first_update: bool = False,
                  context: str = None) -> None:
         """
         Create a new SonoffDevice instance.
@@ -23,16 +24,21 @@ class SonoffDevice(object):
         """
         self.host = host
         self.context = context
-        self.client = SonoffLANModeClient(host)
         self.basic_info = None
         self.params = None
+        self.end_after_first_update = end_after_first_update
 
-        _LOGGER.info('Calling connect in SonoffLANModeClient with handler')
-        asyncio.get_event_loop().run_until_complete(
-            self.client.connect(self.handle_message)
-        )
-        asyncio.get_event_loop().run_forever()
+        _LOGGER.debug('Calling connect in SonoffLANModeClient with handler')
+        self.client = SonoffLANModeClient(host, self.handle_message)
 
+        try:
+            self.loop = asyncio.new_event_loop()
+            self.loop.run_until_complete(self.client.connect())
+            self.loop.run_forever()
+        except asyncio.CancelledError:
+            _LOGGER.debug('SonoffDevice loop ended, returning')
+
+    @asyncio.coroutine
     def handle_message(self, message):
         """
         Receive message sent by the device and handle it, either updating
@@ -42,14 +48,55 @@ class SonoffDevice(object):
 
         if ('error' in response and response['error'] == 0) \
             and 'deviceid' in response:
-            _LOGGER.info('Received basic device info, storing in instance')
+            _LOGGER.debug('Received basic device info, storing in instance')
             self.basic_info = response
         elif 'action' in response and response['action'] == "update":
-            _LOGGER.info('Received update action, updating internal state')
+            _LOGGER.debug(
+                'Received update action, updating internal params state to: %s'
+                % response['params'])
             self.params = response['params']
+
+            if self.end_after_first_update:
+                _LOGGER.debug('Gracefully stopping message receive loop')
+                self.shutdown_loop()
         else:
             _LOGGER.error('Unknown message received from device: ' % message)
             raise Exception('Unknown message received from device')
+
+    def shutdown_loop(self):
+        self.client.keep_running = False
+
+        try:
+            # Hide `asyncio.CancelledError` exceptions during shutdown
+            def shutdown_exception_handler(loop, context):
+                if "exception" not in context \
+                    or not isinstance(context["exception"],
+                                      asyncio.CancelledError):
+                    loop.default_exception_handler(context)
+
+            self.loop.set_exception_handler(shutdown_exception_handler)
+
+            # Handle shutdown gracefully by waiting for all tasks
+            # to be cancelled
+            tasks = asyncio.gather(
+                *asyncio.Task.all_tasks(loop=self.loop),
+                loop=self.loop,
+                return_exceptions=True
+            )
+
+            tasks.add_done_callback(lambda t: self.loop.stop())
+            tasks.cancel()
+
+            # Keep the event loop running until it is either
+            # destroyed or all tasks have really terminated
+            while not tasks.done() and not self.loop.is_closed():
+                self.loop.run_forever()
+        finally:
+            if hasattr(self.loop, "shutdown_asyncgens"):  # Python 3.5
+                self.loop.run_until_complete(
+                    self.loop.shutdown_asyncgens()
+                )
+                self.loop.close()
 
     @property
     def device_id(self) -> str:

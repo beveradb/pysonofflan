@@ -28,8 +28,9 @@ class SonoffSwitch(SonoffDevice):
 
     def __init__(self,
                  host: str,
+                 end_after_first_update: bool = False,
                  context: str = None) -> None:
-        SonoffDevice.__init__(self, host, context)
+        SonoffDevice.__init__(self, host, end_after_first_update, context)
 
     @property
     async def state(self) -> str:
@@ -73,35 +74,42 @@ class SonoffSwitch(SonoffDevice):
             raise ValueError("State %s is not valid.", value)
 
     @property
-    async def is_on(self) -> bool:
+    def is_on(self) -> bool:
         """
         Returns whether device is on.
-
         :return: True if device is on, False otherwise
         """
-        if 'switch' in self.client.latest_params:
-            return self.client.latest_params.switch == "on"
+        if 'switch' in self.params:
+            return self.params['switch'] == "on"
 
         return False
 
-    async def turn_on(self):
+    def turn_on(self):
         """
         Turn the switch on.
         """
-        await self.client.send(
-            self.client.get_update_payload(
-                self.device_id,
-                {"switch": "on"}
+        _LOGGER.info("Switch turn_on called.")
+
+        self.loop.run_until_complete(
+            self.client.send(
+                self.client.get_update_payload(
+                    self.device_id,
+                    {"switch": "on"}
+                )
             )
         )
 
-    async def turn_off(self):
+    def turn_off(self):
         """
         Turn the switch off.
         """
-        await self.client.send(
-            self.client.get_update_payload(
-                self.device_id,
-                {"switch": "off"}
+        _LOGGER.info("Switch turn_off called.")
+
+        self.loop.run_until_complete(
+            self.client.send(
+                self.client.get_update_payload(
+                    self.device_id,
+                    {"switch": "off"}
+                )
             )
         )

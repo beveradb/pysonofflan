@@ -11,7 +11,7 @@ if sys.version_info < (3, 5):
           sys.version_info)
     sys.exit(1)
 
-pass_sonoff_switch = click.make_pass_decorator(SonoffSwitch)
+pass_host = click.make_pass_decorator(str)
 
 
 @click.group(invoke_without_command=True)
@@ -47,13 +47,7 @@ def cli(ctx, host, device_id, debug):
             "No host name given - try discovery mode to find your device!")
         sys.exit(1)
 
-    click.echo("Initialising SonoffSwitch with host %s" % host)
-    ctx.obj = SonoffSwitch(host)
-
-    if ctx.invoked_subcommand == "state":
-        return
-
-    ctx.invoke(state)
+    ctx.obj = host
 
 
 @cli.command()
@@ -88,40 +82,49 @@ def find_host_from_device_id(device_id):
 
 
 @cli.command()
-@pass_sonoff_switch
-def state(device: SonoffSwitch):
+@pass_host
+def state(host: str):
     """Print out device ID and state."""
 
-    try:
-        device_id = device.device_id
-    except Exception as ex:
-        click.echo("Error getting device ID: %s" % ex)
-        return None
+    click.echo("Initialising SonoffSwitch with host %s" % host)
+    device = SonoffSwitch(host, end_after_first_update=True)
+    print_device_details(device)
+
+
+def print_device_details(device):
+    device_id = device.device_id
 
     click.echo(
         click.style("== Device: %s ==" % device_id, bold=True)
     )
 
-    is_on = asyncio.get_event_loop().run_until_complete(device.is_on)
-    click.echo("State: " + click.style("ON" if is_on else "OFF",
-                                       fg="green" if is_on else "red"))
+    click.echo("State: " + click.style("ON" if device.is_on else "OFF",
+                                       fg="green" if device.is_on else "red"))
     click.echo("Host/IP: %s" % device.host)
 
 
 @cli.command()
-@pass_sonoff_switch
-def on(device: SonoffSwitch):
+@pass_host
+def on(host: str):
     """Turn the device on."""
+    click.echo("Initialising SonoffSwitch with host %s" % host)
+    device = SonoffSwitch(host)
+    print_device_details(device)
+
     click.echo("Turning on..")
-    asyncio.get_event_loop().run_until_complete(device.turn_on())
+    device.turn_on()
 
 
 @cli.command()
-@pass_sonoff_switch
-async def off(device: SonoffSwitch):
+@pass_host
+def off(host: str):
     """Turn the device off."""
+    click.echo("Initialising SonoffSwitch with host %s" % host)
+    device = SonoffSwitch(host)
+    print_device_details(device)
+
     click.echo("Turning off..")
-    asyncio.get_event_loop().run_until_complete(device.turn_off())
+    device.turn_off()
 
 
 if __name__ == "__main__":
