@@ -98,7 +98,7 @@ class SonoffLANModeClient:
         )
 
     async def close_connection(self):
-        _LOGGER.debug('Closing websocket from client close_connection (NOPE)')
+        _LOGGER.debug('Closing websocket from client close_connection')
         await self.websocket.close()
 
     async def receive_message_loop(self):
@@ -110,8 +110,8 @@ class SonoffLANModeClient:
                 _LOGGER.debug('Message passed to handler, should loop now')
         finally:
             _LOGGER.debug('receive_message_loop finally block reached: '
-                          'closing websocket (NOPE)')
-            # await self.websocket.close()
+                          'closing websocket')
+            await self.websocket.close()
 
     async def send_online_message(self):
         _LOGGER.debug('Sending user online message over websocket')

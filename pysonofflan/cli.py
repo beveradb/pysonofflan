@@ -1,8 +1,12 @@
 import asyncio
-import logging
 import sys
 
 import click
+import logging
+import click_log
+
+logger = logging.getLogger(__name__)
+click_log.basic_config(logger)
 
 from pysonofflan import (SonoffSwitch, Discover)
 
@@ -24,6 +28,7 @@ pass_config = click.make_pass_decorator(dict, ensure=True)
                    'Inching/Momentary switch.')
 @click.option('--debug/--normal', default=False)
 @click.pass_context
+@click_log.simple_verbosity_option(logger)
 def cli(ctx, host, device_id, inching, debug):
     """A cli tool for controlling Sonoff Smart Switches/Plugs
     (Basic/S20/Touch) in LAN Mode."""
@@ -36,17 +41,17 @@ def cli(ctx, host, device_id, inching, debug):
         return
 
     if device_id is not None and host is None:
-        click.echo(
+        logger.info(
             "Device ID is given, using discovery to find host %s" % device_id)
         host = find_host_from_device_id(device_id=device_id)
         if host:
-            click.echo("Matching Device ID found! IP: %s" % host)
+            logger.info("Matching Device ID found! IP: %s" % host)
         else:
-            click.echo("No device with name %s found" % device_id)
+            logger.info("No device with name %s found" % device_id)
             return
 
     if host is None:
-        click.echo(
+        logger.info(
             "No host name given - try discovery mode to find your device!")
         sys.exit(1)
 
@@ -56,14 +61,14 @@ def cli(ctx, host, device_id, inching, debug):
 @cli.command()
 def discover():
     """Discover devices in the network."""
-    click.echo(
+    logger.info(
         "Attempting to discover Sonoff LAN Mode devices "
         "on the local network, please wait..."
     )
     found_devices = asyncio.get_event_loop().run_until_complete(
         Discover.discover()).items()
     for ip, found_device_id in found_devices:
-        click.echo("Found Sonoff LAN Mode device at IP %s with ID: %s" % (
+        logger.info("Found Sonoff LAN Mode device at IP %s with ID: %s" % (
             ip, found_device_id))
 
     return found_devices
@@ -71,14 +76,14 @@ def discover():
 
 def find_host_from_device_id(device_id):
     """Discover a device identified by its device_id"""
-    click.echo(
+    logger.info(
         "Trying to discover %s by scanning for devices "
         "on local network, please wait..." % device_id)
     found_devices = asyncio.get_event_loop().run_until_complete(
         Discover.discover()).items()
     for ip, found_device_id in found_devices:
-        click.echo("Found Sonoff LAN Mode device at IP %s with ID: %s"
-                   % (ip, found_device_id))
+        logger.info("Found Sonoff LAN Mode device at IP %s with ID: %s"
+                    % (ip, found_device_id))
         if found_device_id.lower() == device_id.lower():
             return ip
     return None
@@ -96,10 +101,11 @@ def state(config: dict):
 
             device.shutdown_event_loop()
 
-    click.echo("Initialising SonoffSwitch with host %s" % config['host'])
+    logger.info("Initialising SonoffSwitch with host %s" % config['host'])
     SonoffSwitch(
         host=config['host'],
-        callback_after_update=state_callback
+        callback_after_update=state_callback,
+        logger=logger
     )
 
 
@@ -113,18 +119,19 @@ def listen(config: dict):
             print_device_details(self)
 
             if self.shared_state['callback_counter'] == 0:
-                click.echo(
+                logger.info(
                     "Listening for updates forever... Press CTRL+C to quit.")
 
         self.shared_state['callback_counter'] += 1
 
-    click.echo("Initialising SonoffSwitch with host %s" % config['host'])
+    logger.info("Initialising SonoffSwitch with host %s" % config['host'])
 
     shared_state = {'callback_counter': 0}
     SonoffSwitch(
         host=config['host'],
         callback_after_update=state_callback,
-        shared_state=shared_state
+        shared_state=shared_state,
+        logger=logger
     )
 
 
@@ -132,24 +139,24 @@ def print_device_details(device):
     if device.basic_info is not None:
         device_id = device.device_id
 
-        click.echo(
+        logger.info(
             click.style("== Device: %s (%s) ==" % (device_id, device.host),
                         bold=True)
         )
 
-        click.echo("State: " + click.style(
+        logger.info("State: " + click.style(
             "ON" if device.is_on else "OFF",
             fg="green" if device.is_on else "red")
-                   )
+                    )
 
 
 def switch_device(host, inching, new_state):
-    click.echo("Initialising SonoffSwitch with host %s" % host)
+    logger.info("Initialising SonoffSwitch with host %s" % host)
 
     async def update_callback(device: SonoffSwitch):
         if device.basic_info is not None:
             if inching is None:
-                click.echo("Initial state:")
+                logger.info("Initial state:")
                 print_device_details(device)
 
                 device.client.keep_running = False
@@ -158,16 +165,17 @@ def switch_device(host, inching, new_state):
                 else:
                     await device.turn_off()
             else:
-                click.echo("Inching device activated by switching ON for "
-                           "%ss" % inching)
+                logger.info("Inching device activated by switching ON for "
+                            "%ss" % inching)
 
-            click.echo("New state:")
+            logger.info("New state:")
             print_device_details(device)
 
     SonoffSwitch(
         host=host,
         callback_after_update=update_callback,
-        inching_seconds=int(inching) if inching else None
+        inching_seconds=int(inching) if inching else None,
+        logger=logger
     )
 
 

@@ -11,7 +11,8 @@ with open('README.rst') as readme_file:
 with open('HISTORY.rst') as history_file:
     history = history_file.read()
 
-requirements = ['Click>=6.0', 'websockets', 'async-timeout==3.0.1']
+requirements = ['Click>=6.0', 'click_log', 'websockets',
+                'async-timeout==3.0.1']
 setup_requirements = []
 test_requirements = []
 

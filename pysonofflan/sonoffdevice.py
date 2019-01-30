@@ -11,14 +11,13 @@ import websockets
 
 from .client import SonoffLANModeClient
 
-_LOGGER = logging.getLogger(__name__)
-
 
 class SonoffDevice(object):
     def __init__(self,
                  host: str,
                  callback_after_update: Callable[..., Awaitable[None]] = None,
                  shared_state: Dict = None,
+                 logger=None,
                  ping_interval=SonoffLANModeClient.DEFAULT_PING_INTERVAL,
                  timeout=SonoffLANModeClient.DEFAULT_TIMEOUT,
                  context: str = None) -> None:
@@ -37,7 +36,13 @@ class SonoffDevice(object):
         self.send_updated_params_task = None
         self.params_updated_event = None
 
-        _LOGGER.debug('Initializing SonoffLANModeClient class in SonoffDevice')
+        if logger is None:
+            self.logger = logging.getLogger(__name__)
+        else:
+            self.logger = logger
+
+        self.logger.debug(
+            'Initializing SonoffLANModeClient class in SonoffDevice')
         self.client = SonoffLANModeClient(
             host,
             self.handle_message,
@@ -57,39 +62,43 @@ class SonoffDevice(object):
             self.loop.run_until_complete(self.setup_connection())
 
         except asyncio.CancelledError:
-            _LOGGER.debug('SonoffDevice loop ended, returning')
+            self.logger.debug('SonoffDevice loop ended, returning')
 
     async def setup_connection(self):
-        _LOGGER.debug('setup_connection is active on the event loop')
+        self.logger.debug('setup_connection is active on the event loop')
 
         try:
-            _LOGGER.debug('setup_connection yielding to connect()')
+            self.logger.debug('setup_connection yielding to connect()')
             await self.client.connect()
-            _LOGGER.debug('setup_connection yielding to send_online_message()')
+            self.logger.debug(
+                'setup_connection yielding to send_online_message()')
             await self.client.send_online_message()
-            _LOGGER.debug(
+            self.logger.debug(
                 'setup_connection yielding to receive_message_loop()')
             await self.client.receive_message_loop()
         except ConnectionRefusedError:
-            _LOGGER.error('Unable to connect: connection refused')
+            self.logger.error('Unable to connect: connection refused')
             self.shutdown_event_loop()
         except websockets.exceptions.ConnectionClosed:
-            _LOGGER.error('Connection closed unexpectedly')
+            self.logger.error('Connection closed unexpectedly')
             self.shutdown_event_loop()
         finally:
-            _LOGGER.debug('finally: closing websocket from setup_connection '
-                          '(NOPE)')
-            # await self.client.close_connection()
+            self.logger.debug(
+                'finally: closing websocket from setup_connection')
+            await self.client.close_connection()
 
-        _LOGGER.debug('setup_connection resumed, exiting')
+        self.logger.debug('setup_connection resumed, exiting')
 
     async def send_updated_params_loop(self):
-        _LOGGER.debug('send_updated_params_loop is active on the event loop')
+        self.logger.debug(
+            'send_updated_params_loop is active on the event loop')
 
         try:
-            _LOGGER.debug('Starting loop waiting for device params to change')
+            self.logger.debug(
+                'Starting loop waiting for device params to change')
             while self.client.keep_running:
-                _LOGGER.debug('send_updated_params_loop now awaiting event')
+                self.logger.debug(
+                    'send_updated_params_loop now awaiting event')
                 await self.params_updated_event.wait()
 
                 update_message = self.client.get_update_payload(
@@ -98,17 +107,19 @@ class SonoffDevice(object):
                 )
                 await self.client.send(update_message)
                 self.params_updated_event.clear()
-                _LOGGER.debug('Update message sent, event cleared, should '
-                              'loop now')
+                self.logger.debug('Update message sent, event cleared, should '
+                                  'loop now')
         finally:
-            _LOGGER.debug('send_updated_params_loop finally block reached: '
-                          'closing websocket (NOPE)')
-            # await self.client.close_connection()
+            self.logger.debug(
+                'send_updated_params_loop finally block reached: '
+                'closing websocket')
+            await self.client.close_connection()
 
-        _LOGGER.debug('send_updated_params_loop resumed outside loop, exiting')
+        self.logger.debug(
+            'send_updated_params_loop resumed outside loop, exiting')
 
     def update_params(self, params):
-        _LOGGER.debug(
+        self.logger.debug(
             'Scheduling params update message to device: %s' % params
         )
         self.params = params
@@ -123,10 +134,11 @@ class SonoffDevice(object):
 
         if ('error' in response and response['error'] == 0) \
             and 'deviceid' in response:
-            _LOGGER.debug('Received basic device info, storing in instance')
+            self.logger.debug(
+                'Received basic device info, storing in instance')
             self.basic_info = response
         elif 'action' in response and response['action'] == "update":
-            _LOGGER.debug(
+            self.logger.debug(
                 'Received update from device, updating internal state to: %s'
                 % response['params'])
             self.params = response['params']
@@ -134,12 +146,14 @@ class SonoffDevice(object):
             if self.callback_after_update is not None:
                 await self.callback_after_update(self)
         else:
-            _LOGGER.error('Unknown message received from device: ' % message)
+            self.logger.error(
+                'Unknown message received from device: ' % message)
             raise Exception('Unknown message received from device')
 
     def shutdown_event_loop(self):
-        _LOGGER.debug('shutdown_event_loop called, setting keep_running to '
-                      'False')
+        self.logger.debug(
+            'shutdown_event_loop called, setting keep_running to '
+            'False')
         self.client.keep_running = False
 
         try:

@@ -1,11 +1,8 @@
 import asyncio
 import logging
-import time
 from typing import Callable, Awaitable, Dict
 
 from pysonofflan import SonoffDevice, SonoffLANModeClient
-
-_LOGGER = logging.getLogger(__name__)
 
 
 class SonoffSwitch(SonoffDevice):
@@ -35,6 +32,7 @@ class SonoffSwitch(SonoffDevice):
                      [SonoffDevice], Awaitable[None]] = None,
                  shared_state: Dict = None,
                  inching_seconds: int = None,
+                 logger=None,
                  ping_interval=SonoffLANModeClient.DEFAULT_PING_INTERVAL,
                  timeout=SonoffLANModeClient.DEFAULT_TIMEOUT,
                  context: str = None) -> None:
@@ -42,10 +40,16 @@ class SonoffSwitch(SonoffDevice):
         self.inching_seconds = inching_seconds
         self.parent_callback_after_update = callback_after_update
 
+        if logger is None:
+            self.logger = logging.getLogger(__name__)
+        else:
+            self.logger = logger
+
         SonoffDevice.__init__(
             self,
             host=host,
             callback_after_update=self.pre_callback_after_update,
+            logger=self.logger,
             shared_state=shared_state,
             ping_interval=ping_interval,
             timeout=timeout,
@@ -70,7 +74,7 @@ class SonoffSwitch(SonoffDevice):
         elif state == "on":
             return SonoffSwitch.SWITCH_STATE_ON
         else:
-            _LOGGER.warning("Unknown state %s returned.", state)
+            self.logger.warning("Unknown state %s returned.", state)
             return SonoffSwitch.SWITCH_STATE_UNKNOWN
 
     @state.setter
@@ -108,25 +112,25 @@ class SonoffSwitch(SonoffDevice):
         """
         Turn the switch on.
         """
-        _LOGGER.debug("Switch turn_on called.")
+        self.logger.debug("Switch turn_on called.")
         self.update_params({"switch": "on"})
 
     async def turn_off(self):
         """
         Turn the switch off.
         """
-        _LOGGER.debug("Switch turn_off called.")
+        self.logger.debug("Switch turn_off called.")
         self.update_params({"switch": "off"})
 
     async def shutdown_inching(self):
-        _LOGGER.debug("shutdown_inching running")
+        self.logger.debug("shutdown_inching running")
         await self.turn_off()
         await asyncio.sleep(1)
         await self.parent_callback_after_update(self)
         self.shutdown_event_loop()
 
     def callback_to_turn_off_inching(self):
-        _LOGGER.debug("callback_to_turn_off_inching running")
+        self.logger.debug("callback_to_turn_off_inching running")
         asyncio.ensure_future(self.shutdown_inching())
 
     async def pre_callback_after_update(self, passed_self):
@@ -134,18 +138,20 @@ class SonoffSwitch(SonoffDevice):
         Handle update callback to implement inching functionality before
         calling the parent callback
         """
-        _LOGGER.debug("Switch update pre-callback filter running")
+        self.logger.debug("Switch update pre-callback filter running")
 
         if self.basic_info is None:
-            _LOGGER.debug("Basic info still none, waiting for init message")
+            self.logger.debug(
+                "Basic info still none, waiting for init message")
             return
 
         if self.inching_seconds is not None:
-            _LOGGER.debug("Inching switch pre-callback logic running")
+            self.logger.debug("Inching switch pre-callback logic running")
 
             if self.is_off:
-                _LOGGER.debug("Inching switch activated, waiting %ss before "
-                              "turning OFF again" % self.inching_seconds)
+                self.logger.debug(
+                    "Inching switch activated, waiting %ss before "
+                    "turning OFF again" % self.inching_seconds)
 
                 self.loop.call_later(
                     self.inching_seconds,
@@ -154,5 +160,5 @@ class SonoffSwitch(SonoffDevice):
 
                 await self.turn_on()
         else:
-            _LOGGER.debug("Not inching switch, calling parent callback")
+            self.logger.debug("Not inching switch, calling parent callback")
             await self.parent_callback_after_update(self)
