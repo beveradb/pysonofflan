@@ -5,7 +5,7 @@ Python library supporting Sonoff Smart Devices (Basic/S20/Touch) in LAN Mode.
 import asyncio
 import json
 import logging
-from typing import Callable, Awaitable
+from typing import Callable, Awaitable, Dict
 
 import websockets
 
@@ -17,9 +17,8 @@ _LOGGER = logging.getLogger(__name__)
 class SonoffDevice(object):
     def __init__(self,
                  host: str,
-                 end_after_first_update: bool = False,
-                 callback_after_update: Callable[
-                     [str], Awaitable[None]] = None,
+                 callback_after_update: Callable[..., Awaitable[None]] = None,
+                 shared_state: Dict = None,
                  ping_interval=SonoffLANModeClient.DEFAULT_PING_INTERVAL,
                  timeout=SonoffLANModeClient.DEFAULT_TIMEOUT,
                  context: str = None) -> None:
@@ -32,9 +31,9 @@ class SonoffDevice(object):
         self.callback_after_update = callback_after_update
         self.host = host
         self.context = context
+        self.shared_state = shared_state
         self.basic_info = None
         self.params = None
-        self.end_after_first_update = end_after_first_update
         self.send_updated_params_task = None
         self.params_updated_event = None
 
@@ -134,10 +133,6 @@ class SonoffDevice(object):
 
             if self.callback_after_update is not None:
                 await self.callback_after_update(self)
-
-            if self.end_after_first_update:
-                _LOGGER.debug('Gracefully stopping message receive loop')
-                self.shutdown_event_loop()
         else:
             _LOGGER.error('Unknown message received from device: ' % message)
             raise Exception('Unknown message received from device')
@@ -198,7 +193,7 @@ class SonoffDevice(object):
         raise NotImplementedError("Device subclass needs to implement this.")
 
     @property
-    async def is_off(self) -> bool:
+    def is_off(self) -> bool:
         """
         Returns whether device is off.
 
@@ -214,7 +209,7 @@ class SonoffDevice(object):
         raise NotImplementedError("Device subclass needs to implement this.")
 
     @property
-    async def is_on(self) -> bool:
+    def is_on(self) -> bool:
         """
         Returns whether the device is on.
 

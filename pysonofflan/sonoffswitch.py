@@ -1,5 +1,7 @@
+import asyncio
 import logging
-from typing import Callable, Awaitable
+import time
+from typing import Callable, Awaitable, Dict
 
 from pysonofflan import SonoffDevice, SonoffLANModeClient
 
@@ -29,25 +31,30 @@ class SonoffSwitch(SonoffDevice):
 
     def __init__(self,
                  host: str,
-                 end_after_first_update: bool = False,
                  callback_after_update: Callable[
-                     [str], Awaitable[None]] = None,
+                     [SonoffDevice], Awaitable[None]] = None,
+                 shared_state: Dict = None,
+                 inching_seconds: int = None,
                  ping_interval=SonoffLANModeClient.DEFAULT_PING_INTERVAL,
                  timeout=SonoffLANModeClient.DEFAULT_TIMEOUT,
                  context: str = None) -> None:
 
+        # self.inching_switched_on = False
+        self.inching_seconds = inching_seconds
+        # self.parent_callback_after_update = callback_after_update
+
         SonoffDevice.__init__(
             self,
             host=host,
-            end_after_first_update=end_after_first_update,
             callback_after_update=callback_after_update,
+            shared_state=shared_state,
             ping_interval=ping_interval,
             timeout=timeout,
             context=context
         )
 
     @property
-    async def state(self) -> str:
+    def state(self) -> str:
         """
         Retrieve the switch state
 
@@ -98,16 +105,54 @@ class SonoffSwitch(SonoffDevice):
 
         return False
 
-    def turn_on(self):
+    async def turn_on(self):
         """
         Turn the switch on.
         """
         _LOGGER.debug("Switch turn_on called.")
         self.update_params({"switch": "on"})
 
-    def turn_off(self):
+    async def turn_off(self):
         """
         Turn the switch off.
         """
         _LOGGER.debug("Switch turn_off called.")
         self.update_params({"switch": "off"})
+
+    # async def pre_callback_after_update(self):
+    #     """
+    #     Handle update callback to implement inching functionality before
+    #     calling the parent callback
+    #     """
+    #     _LOGGER.info("Switch update pre-callback filter running")
+    #
+    #     if self.basic_info is None:
+    #         _LOGGER.info("Basic info still none, waiting for init message")
+    #         return
+    #
+    #     if self.inching_seconds is not None:
+    #         _LOGGER.info("Inching switch pre-callback logic running")
+    #
+    #         if self.is_on:
+    #             _LOGGER.info("Inching switch ON, waiting %s "
+    #                          "seconds before switching OFF again..." %
+    #                          self.inching_seconds)
+    #
+    #             self.inching_switched_on = True
+    #             await asyncio.sleep(self.inching_seconds)
+    #
+    #             _LOGGER.info("Switching Inching switch OFF again after timer")
+    #             self.update_params({"switch": "off"})
+    #         else:
+    #             if self.inching_switched_on:
+    #                 _LOGGER.info("Inching switch OFF, and it has been "
+    #                              "switched ON previously, calling parent "
+    #                              "callback")
+    #                 await self.parent_callback_after_update(self)
+    #             else:
+    #                 _LOGGER.info("Inching switch OFF, but hasn't been "
+    #                              "switched ON yet, calling parent callback")
+    #                 await self.parent_callback_after_update(self)
+    #     else:
+    #         _LOGGER.info("Not inching switch, calling parent callback")
+    #         await self.parent_callback_after_update(self)
