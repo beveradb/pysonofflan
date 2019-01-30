@@ -39,14 +39,13 @@ class SonoffSwitch(SonoffDevice):
                  timeout=SonoffLANModeClient.DEFAULT_TIMEOUT,
                  context: str = None) -> None:
 
-        # self.inching_switched_on = False
         self.inching_seconds = inching_seconds
-        # self.parent_callback_after_update = callback_after_update
+        self.parent_callback_after_update = callback_after_update
 
         SonoffDevice.__init__(
             self,
             host=host,
-            callback_after_update=callback_after_update,
+            callback_after_update=self.pre_callback_after_update,
             shared_state=shared_state,
             ping_interval=ping_interval,
             timeout=timeout,
@@ -119,40 +118,41 @@ class SonoffSwitch(SonoffDevice):
         _LOGGER.debug("Switch turn_off called.")
         self.update_params({"switch": "off"})
 
-    # async def pre_callback_after_update(self):
-    #     """
-    #     Handle update callback to implement inching functionality before
-    #     calling the parent callback
-    #     """
-    #     _LOGGER.info("Switch update pre-callback filter running")
-    #
-    #     if self.basic_info is None:
-    #         _LOGGER.info("Basic info still none, waiting for init message")
-    #         return
-    #
-    #     if self.inching_seconds is not None:
-    #         _LOGGER.info("Inching switch pre-callback logic running")
-    #
-    #         if self.is_on:
-    #             _LOGGER.info("Inching switch ON, waiting %s "
-    #                          "seconds before switching OFF again..." %
-    #                          self.inching_seconds)
-    #
-    #             self.inching_switched_on = True
-    #             await asyncio.sleep(self.inching_seconds)
-    #
-    #             _LOGGER.info("Switching Inching switch OFF again after timer")
-    #             self.update_params({"switch": "off"})
-    #         else:
-    #             if self.inching_switched_on:
-    #                 _LOGGER.info("Inching switch OFF, and it has been "
-    #                              "switched ON previously, calling parent "
-    #                              "callback")
-    #                 await self.parent_callback_after_update(self)
-    #             else:
-    #                 _LOGGER.info("Inching switch OFF, but hasn't been "
-    #                              "switched ON yet, calling parent callback")
-    #                 await self.parent_callback_after_update(self)
-    #     else:
-    #         _LOGGER.info("Not inching switch, calling parent callback")
-    #         await self.parent_callback_after_update(self)
+    async def shutdown_inching(self):
+        _LOGGER.debug("shutdown_inching running")
+        await self.turn_off()
+        await asyncio.sleep(1)
+        await self.parent_callback_after_update(self)
+        self.shutdown_event_loop()
+
+    def callback_to_turn_off_inching(self):
+        _LOGGER.debug("callback_to_turn_off_inching running")
+        asyncio.ensure_future(self.shutdown_inching())
+
+    async def pre_callback_after_update(self, passed_self):
+        """
+        Handle update callback to implement inching functionality before
+        calling the parent callback
+        """
+        _LOGGER.debug("Switch update pre-callback filter running")
+
+        if self.basic_info is None:
+            _LOGGER.debug("Basic info still none, waiting for init message")
+            return
+
+        if self.inching_seconds is not None:
+            _LOGGER.debug("Inching switch pre-callback logic running")
+
+            if self.is_off:
+                _LOGGER.debug("Inching switch activated, waiting %ss before "
+                              "turning OFF again" % self.inching_seconds)
+
+                self.loop.call_later(
+                    self.inching_seconds,
+                    self.callback_to_turn_off_inching
+                )
+
+                await self.turn_on()
+        else:
+            _LOGGER.debug("Not inching switch, calling parent callback")
+            await self.parent_callback_after_update(self)

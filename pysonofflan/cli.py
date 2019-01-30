@@ -99,8 +99,7 @@ def state(config: dict):
     click.echo("Initialising SonoffSwitch with host %s" % config['host'])
     SonoffSwitch(
         host=config['host'],
-        callback_after_update=state_callback,
-        ping_interval=60
+        callback_after_update=state_callback
     )
 
 
@@ -125,8 +124,7 @@ def listen(config: dict):
     SonoffSwitch(
         host=config['host'],
         callback_after_update=state_callback,
-        shared_state=shared_state,
-        ping_interval=60
+        shared_state=shared_state
     )
 
 
@@ -148,57 +146,28 @@ def print_device_details(device):
 def switch_device(host, inching, new_state):
     click.echo("Initialising SonoffSwitch with host %s" % host)
 
-    async def turn_on_callback(device: SonoffSwitch):
-        click.echo("Initial state:")
-
-        async def shutdown_inching():
-            device.keep_running = False
-            await device.turn_off()
-
-            await asyncio.sleep(1)
-
-            click.echo("New state:")
-            print_device_details(device)
-
-            device.shutdown_event_loop()
-
-        def callback_to_turn_off_inching():
-            asyncio.ensure_future(shutdown_inching())
-
+    async def update_callback(device: SonoffSwitch):
         if device.basic_info is not None:
-            print_device_details(device)
+            if inching is None:
+                click.echo("Initial state:")
+                print_device_details(device)
 
-            if inching is not None:
-                if device.is_off:
-                    click.echo("Inching switch activated, waiting %ss "
-                               "before turning OFF again" % inching)
-
-                    device.loop.call_later(
-                        int(inching),
-                        callback_to_turn_off_inching
-                    )
-
-                    await device.turn_on()
-            else:
                 device.client.keep_running = False
                 if new_state == "on":
                     await device.turn_on()
                 else:
                     await device.turn_off()
+            else:
+                click.echo("Inching device activated by switching ON for "
+                           "%ss" % inching)
 
-                click.echo("New state:")
-                print_device_details(device)
-
-    inching_seconds = None
-
-    if inching is not None:
-        inching_seconds = int(inching)
+            click.echo("New state:")
+            print_device_details(device)
 
     SonoffSwitch(
         host=host,
-        callback_after_update=turn_on_callback,
-        inching_seconds=inching_seconds,
-        ping_interval=60
+        callback_after_update=update_callback,
+        inching_seconds=int(inching) if inching else None
     )
 
 

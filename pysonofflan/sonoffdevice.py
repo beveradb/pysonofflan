@@ -126,7 +126,7 @@ class SonoffDevice(object):
             _LOGGER.debug('Received basic device info, storing in instance')
             self.basic_info = response
         elif 'action' in response and response['action'] == "update":
-            _LOGGER.info(
+            _LOGGER.debug(
                 'Received update from device, updating internal state to: %s'
                 % response['params'])
             self.params = response['params']
