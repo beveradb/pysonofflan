@@ -99,7 +99,8 @@ class SonoffLANModeClient:
 
     async def close_connection(self):
         _LOGGER.debug('Closing websocket from client close_connection')
-        await self.websocket.close()
+        if self.websocket is not None:
+            await self.websocket.close()
 
     async def receive_message_loop(self):
         try:
@@ -111,7 +112,8 @@ class SonoffLANModeClient:
         finally:
             _LOGGER.debug('receive_message_loop finally block reached: '
                           'closing websocket')
-            await self.websocket.close()
+            if self.websocket is not None:
+                await self.websocket.close()
 
     async def send_online_message(self):
         _LOGGER.debug('Sending user online message over websocket')
@@ -137,8 +139,10 @@ class SonoffLANModeClient:
         # confirmation response
         await self.event_handler(response_message)
 
-        if ('error' in response and response['error'] == 0) \
-            and 'deviceid' in response:
+        if (
+            ('error' in response and response['error'] == 0)
+            and 'deviceid' in response
+        ):
             _LOGGER.debug('Websocket connected and accepted online user OK')
             return True
         else:
@@ -187,21 +191,3 @@ class SonoffLANModeClient:
             'controlType': 4,
             'ts': 0
         }
-
-# Uncomment the below to test this websocket client directly on CLI
-
-# async def print_event_handler(message: str):
-#     print("CALLBACK SUCCESS! Message: %s" % message)
-#
-# logging.basicConfig(level=logging.DEBUG)  # Shows debug logs from websocket
-# _LOGGER.setLevel(logging.DEBUG)
-# handler = logging.StreamHandler(sys.stdout)
-# handler.setLevel(logging.DEBUG)
-# formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
-# handler.setFormatter(formatter)
-# _LOGGER.addHandler(handler)
-# client = SonoffLANModeClient('127.0.0.1', print_event_handler)
-# # client = SonoffLANModeClient('192.168.0.76', print_event_handler)
-#
-# asyncio.get_event_loop().run_until_complete(client.connect())
-# asyncio.get_event_loop().run_forever()

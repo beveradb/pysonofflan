@@ -132,8 +132,10 @@ class SonoffDevice(object):
         """
         response = json.loads(message)
 
-        if ('error' in response and response['error'] == 0) \
-            and 'deviceid' in response:
+        if (
+            ('error' in response and response['error'] == 0)
+            and 'deviceid' in response
+        ):
             self.logger.debug(
                 'Received basic device info, storing in instance')
             self.basic_info = response
@@ -157,7 +159,7 @@ class SonoffDevice(object):
         self.client.keep_running = False
 
         try:
-            # Hide `asyncio.CancelledError` exceptions during shutdown
+            # Hide Cancelled Error exceptions during shutdown
             def shutdown_exception_handler(loop, context):
                 if "exception" not in context \
                     or not isinstance(context["exception"],
@@ -169,7 +171,7 @@ class SonoffDevice(object):
             # Handle shutdown gracefully by waiting for all tasks
             # to be cancelled
             tasks = asyncio.gather(
-                *asyncio.Task.all_tasks(loop=self.loop),
+                *asyncio.all_tasks(loop=self.loop),
                 loop=self.loop,
                 return_exceptions=True
             )
@@ -179,12 +181,18 @@ class SonoffDevice(object):
 
             # Keep the event loop running until it is either
             # destroyed or all tasks have really terminated
-            while not tasks.done() and not self.loop.is_closed() and not \
-                self.loop.is_running():
+            while (
+                not tasks.done()
+                and not self.loop.is_closed()
+                and not self.loop.is_running()
+            ):
                 self.loop.run_forever()
         finally:
-            if hasattr(self.loop, "shutdown_asyncgens") and \
-                not self.loop.is_running():  # Python 3.5
+            if (
+                hasattr(self.loop, "shutdown_asyncgens")
+                and not self.loop.is_running()
+            ):
+                # Python 3.5
                 self.loop.run_until_complete(
                     self.loop.shutdown_asyncgens()
                 )

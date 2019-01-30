@@ -133,7 +133,7 @@ class SonoffSwitch(SonoffDevice):
         self.logger.debug("callback_to_turn_off_inching running")
         asyncio.ensure_future(self.shutdown_inching())
 
-    async def pre_callback_after_update(self, passed_self):
+    async def pre_callback_after_update(self, _):
         """
         Handle update callback to implement inching functionality before
         calling the parent callback

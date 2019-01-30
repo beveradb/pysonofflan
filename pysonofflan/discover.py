@@ -2,9 +2,7 @@ import ipaddress
 import logging
 import socket
 from itertools import chain
-from typing import Dict, Optional
-
-from pysonofflan import (SonoffLANModeClient)
+from typing import Dict
 
 _LOGGER = logging.getLogger(__name__)
 
