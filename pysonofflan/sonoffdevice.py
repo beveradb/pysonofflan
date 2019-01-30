@@ -31,8 +31,9 @@ class SonoffDevice(object):
         self.context = context
         self.basic_info = None
         self.params = None
-        self.params_updated = False
         self.end_after_first_update = end_after_first_update
+        self.send_updated_params_task = None
+        self.params_updated_event = None
 
         _LOGGER.debug('Initializing SonoffLANModeClient class in SonoffDevice')
         self.client = SonoffLANModeClient(
@@ -46,12 +47,13 @@ class SonoffDevice(object):
             self.loop = asyncio.new_event_loop()
             asyncio.set_event_loop(self.loop)
 
-            self.loop.run_until_complete(
-                asyncio.gather(
-                    self.setup_connection(),
-                    self.send_updated_params_loop()
-                )
+            self.loop.run_until_complete(self.setup_connection())
+
+            self.params_updated_event = asyncio.Event()
+            self.send_updated_params_task = asyncio.create_task(
+                self.send_updated_params_loop()
             )
+
         except asyncio.CancelledError:
             _LOGGER.debug('SonoffDevice loop ended, returning')
 
@@ -85,15 +87,17 @@ class SonoffDevice(object):
         try:
             _LOGGER.debug('Starting loop waiting for device params to change')
             while self.client.keep_running:
-                # TODO: replace with "async with" event-based action
-                if self.params_updated:
-                    update_message = self.client.get_update_payload(
-                        self.device_id,
-                        self.params
-                    )
-                    await self.client.send(update_message)
-                    self.params_updated = False
-                    _LOGGER.debug('Update message sent, should loop now')
+                _LOGGER.debug('send_updated_params_loop now awaiting event')
+                await self.params_updated_event.wait()
+
+                update_message = self.client.get_update_payload(
+                    self.device_id,
+                    self.params
+                )
+                await self.client.send(update_message)
+                self.params_updated_event.clear()
+                _LOGGER.debug('Update message sent, event cleared, should '
+                              'loop now')
         finally:
             _LOGGER.debug('send_updated_params_loop finally block reached: '
                           'closing websocket (NOPE)')
@@ -106,7 +110,7 @@ class SonoffDevice(object):
             'Scheduling params update message to device: %s' % params
         )
         self.params = params
-        self.params_updated = True
+        self.params_updated_event.set()
 
     async def handle_message(self, message):
         """
