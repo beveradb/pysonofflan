@@ -1,4 +1,5 @@
 import logging
+from typing import Callable, Awaitable
 
 from pysonofflan import SonoffDevice, SonoffLANModeClient
 
@@ -29,6 +30,8 @@ class SonoffSwitch(SonoffDevice):
     def __init__(self,
                  host: str,
                  end_after_first_update: bool = False,
+                 callback_after_update: Callable[
+                     [str], Awaitable[None]] = None,
                  ping_interval=SonoffLANModeClient.DEFAULT_PING_INTERVAL,
                  timeout=SonoffLANModeClient.DEFAULT_TIMEOUT,
                  context: str = None) -> None:
@@ -37,6 +40,7 @@ class SonoffSwitch(SonoffDevice):
             self,
             host=host,
             end_after_first_update=end_after_first_update,
+            callback_after_update=callback_after_update,
             ping_interval=ping_interval,
             timeout=timeout,
             context=context
@@ -98,12 +102,12 @@ class SonoffSwitch(SonoffDevice):
         """
         Turn the switch on.
         """
-        _LOGGER.info("Switch turn_on called.")
+        _LOGGER.debug("Switch turn_on called.")
         self.update_params({"switch": "on"})
 
     def turn_off(self):
         """
         Turn the switch off.
         """
-        _LOGGER.info("Switch turn_off called.")
+        _LOGGER.debug("Switch turn_off called.")
         self.update_params({"switch": "off"})

@@ -5,7 +5,7 @@ Python library supporting Sonoff Smart Devices (Basic/S20/Touch) in LAN Mode.
 import asyncio
 import json
 import logging
-import sys
+from typing import Callable, Awaitable
 
 import websockets
 
@@ -18,6 +18,8 @@ class SonoffDevice(object):
     def __init__(self,
                  host: str,
                  end_after_first_update: bool = False,
+                 callback_after_update: Callable[
+                     [str], Awaitable[None]] = None,
                  ping_interval=SonoffLANModeClient.DEFAULT_PING_INTERVAL,
                  timeout=SonoffLANModeClient.DEFAULT_TIMEOUT,
                  context: str = None) -> None:
@@ -27,6 +29,7 @@ class SonoffDevice(object):
         :param str host: host name or ip address on which the device listens
         :param context: optional child ID for context in a parent device
         """
+        self.callback_after_update = callback_after_update
         self.host = host
         self.context = context
         self.basic_info = None
@@ -47,12 +50,12 @@ class SonoffDevice(object):
             self.loop = asyncio.new_event_loop()
             asyncio.set_event_loop(self.loop)
 
-            self.loop.run_until_complete(self.setup_connection())
-
             self.params_updated_event = asyncio.Event()
-            self.send_updated_params_task = asyncio.create_task(
+            self.send_updated_params_task = self.loop.create_task(
                 self.send_updated_params_loop()
             )
+
+            self.loop.run_until_complete(self.setup_connection())
 
         except asyncio.CancelledError:
             _LOGGER.debug('SonoffDevice loop ended, returning')
@@ -105,8 +108,8 @@ class SonoffDevice(object):
 
         _LOGGER.debug('send_updated_params_loop resumed outside loop, exiting')
 
-    async def update_params(self, params):
-        _LOGGER.info(
+    def update_params(self, params):
+        _LOGGER.debug(
             'Scheduling params update message to device: %s' % params
         )
         self.params = params
@@ -125,9 +128,12 @@ class SonoffDevice(object):
             self.basic_info = response
         elif 'action' in response and response['action'] == "update":
             _LOGGER.info(
-                'Received update action, updating internal params state to: %s'
+                'Received update from device, updating internal state to: %s'
                 % response['params'])
             self.params = response['params']
+
+            if self.callback_after_update is not None:
+                await self.callback_after_update(self)
 
             if self.end_after_first_update:
                 _LOGGER.debug('Gracefully stopping message receive loop')
@@ -137,6 +143,8 @@ class SonoffDevice(object):
             raise Exception('Unknown message received from device')
 
     def shutdown_event_loop(self):
+        _LOGGER.debug('shutdown_event_loop called, setting keep_running to '
+                      'False')
         self.client.keep_running = False
 
         try:

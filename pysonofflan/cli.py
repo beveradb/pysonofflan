@@ -108,31 +108,50 @@ def print_device_details(device):
 @pass_host
 def on(host: str):
     """Turn the device on."""
+
+    async def turn_on_callback(device):
+        click.echo("Initial state:")
+
+        if device.basic_info is not None:
+            print_device_details(device)
+
+            device.client.keep_running = False
+            device.turn_on()
+
+            click.echo("New state:")
+            print_device_details(device)
+
     click.echo("Initialising SonoffSwitch with host %s" % host)
-    device = SonoffSwitch(host, ping_interval=60)
-
-    if device.basic_info is not None:
-        print_device_details(device)
-
-        click.echo("Turning on...")
-        device.turn_on()
-
-        click.echo("Closing connection...")
-        device.shutdown_event_loop()
+    SonoffSwitch(
+        host=host,
+        callback_after_update=turn_on_callback,
+        ping_interval=60
+    )
 
 
 @cli.command()
 @pass_host
 def off(host: str):
-    """Turn the device off."""
+    """Turn the device on."""
+
+    async def turn_off_callback(device):
+        click.echo("Initial state:")
+
+        if device.basic_info is not None:
+            print_device_details(device)
+
+            device.client.keep_running = False
+            device.turn_off()
+
+            click.echo("New state:")
+            print_device_details(device)
+
     click.echo("Initialising SonoffSwitch with host %s" % host)
-    device = SonoffSwitch(host)
-
-    if device.basic_info is not None:
-        print_device_details(device)
-
-        click.echo("Turning off...")
-        device.turn_off()
+    SonoffSwitch(
+        host=host,
+        callback_after_update=turn_off_callback,
+        ping_interval=60
+    )
 
 
 if __name__ == "__main__":
