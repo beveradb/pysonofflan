@@ -10,4 +10,5 @@ twine==1.12.1
 pytest>=4.2.0
 git+git://github.com/michaeljoseph/changes@master
 click>=7.0
-
+restructuredtext-lint>=1.2.2
+collective.checkdocs>=0.2
