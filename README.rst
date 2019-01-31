@@ -4,19 +4,24 @@ pySonoffLAN
 
 
 .. image:: https://img.shields.io/pypi/v/pysonofflan.svg
-        :target: https://pypi.python.org/pypi/pysonofflan
+    :target: https://pypi.python.org/pypi/pysonofflan
+    :alt: Latest PyPi Release
 
 .. image:: https://img.shields.io/travis/beveradb/pysonofflan.svg
-        :target: https://travis-ci.org/beveradb/pysonofflan
+    :target: https://travis-ci.org/beveradb/pysonofflan
+    :alt: Build Status
 
 .. image:: https://readthedocs.org/projects/pysonofflan/badge/?version=latest
-        :target: https://pysonofflan.readthedocs.io/en/latest/?badge=latest
-        :alt: Documentation Status
+    :target: https://pysonofflan.readthedocs.io/en/latest/?badge=latest
+    :alt: Documentation Status
 
+.. image:: https://coveralls.io/repos/github/beveradb/pysonofflan/badge.svg?branch=master
+    :target: https://coveralls.io/github/beveradb/pysonofflan?branch=master
+    :alt: Code Coverage
 
 .. image:: https://pyup.io/repos/github/beveradb/pysonofflan/shield.svg
-     :target: https://pyup.io/repos/github/beveradb/pysonofflan/
-     :alt: Updates
+    :target: https://pyup.io/repos/github/beveradb/pysonofflan/
+    :alt: Updates
 
 
 Control Sonoff devices running original firmware, in LAN mode.
@@ -45,9 +50,6 @@ network, but *unable to reach the Itead servers*.
 Most users will only be able to use this by **deliberately
 blocking internet access** to their Sonoff devices.
 
-* Free software: MIT license
-* Documentation: https://pysonofflan.readthedocs.io.
-
 Features
 --------
 
@@ -57,6 +59,11 @@ Features
 * Switch device ON/OFF
 * Listen for state changes announced by the device (e.g. by physical switch)
 * Activate inching/momentary device, with variable ON time (e.g. 1s)
+
+Documentation
+------------------
+
+* Documentation: https://pysonofflan.readthedocs.io.
 
 Install
 ------------------
@@ -87,11 +94,9 @@ Command-Line Usage
       on        Turn the device on.
       state     Connect to device and print current state.
 
-Install / Usage Example
+Usage Example
 =======================
 ::
-
-    $ pip install pysonofflan
 
     $ pysonofflan discover
     2019-01-31 00:45:32,074 - info: Attempting to discover Sonoff LAN Mode devices on the local network, please wait...
@@ -143,6 +148,11 @@ asynchronous.
 
 Module-specific errors are raised as Exceptions, and are expected
 to be handled by the user of the library.
+
+License
+-------
+
+* Free software: MIT license
 
 Credits
 -------
