@@ -19,6 +19,10 @@ pySonoffLAN
     :target: https://coveralls.io/github/beveradb/pysonofflan?branch=master
     :alt: Code Coverage
 
+.. image:: https://img.shields.io/pypi/wheel/pysonofflan.svg
+    :target: https://pypi.org/project/pysonofflan/#files
+    :alt: Has Wheel Package
+
 .. image:: https://pyup.io/repos/github/beveradb/pysonofflan/shield.svg
     :target: https://pyup.io/repos/github/beveradb/pysonofflan/
     :alt: Updates
