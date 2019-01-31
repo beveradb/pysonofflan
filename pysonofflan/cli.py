@@ -76,8 +76,8 @@ def cli(ctx, host, device_id, inching):
             return
 
     if host is None:
-        logger.info(
-            "No host name given - try discovery mode to find your device!")
+        logger.error("No host name given, see usage below:")
+        click.echo(ctx.get_help())
         sys.exit(1)
 
     ctx.obj = {"host": host, "inching": inching}
@@ -93,8 +93,7 @@ def discover():
     found_devices = asyncio.get_event_loop().run_until_complete(
         Discover.discover()).items()
     for ip, found_device_id in found_devices:
-        logger.info("Found Sonoff LAN Mode device at IP %s with ID: %s" % (
-            ip, found_device_id))
+        logger.info("Found Sonoff LAN Mode device at IP %s" % ip)
 
     return found_devices
 
@@ -106,11 +105,33 @@ def find_host_from_device_id(device_id):
         "on local network, please wait..." % device_id)
     found_devices = asyncio.get_event_loop().run_until_complete(
         Discover.discover()).items()
-    for ip, found_device_id in found_devices:
-        logger.info("Found Sonoff LAN Mode device at IP %s with ID: %s"
-                    % (ip, found_device_id))
-        if found_device_id.lower() == device_id.lower():
+    for ip, _ in found_devices:
+        logger.info("Found Sonoff LAN Mode device at IP %s, attempting to "
+                    "read state to get device ID" % ip)
+
+        shared_state = {'device_id_at_current_ip': None}
+
+        async def device_id_callback(device: SonoffSwitch):
+            if device.basic_info is not None:
+                device.shared_state['device_id_at_current_ip'] = \
+                    device.device_id
+                device.keep_running = False
+
+        SonoffSwitch(
+            host=ip,
+            callback_after_update=device_id_callback,
+            shared_state=shared_state,
+            logger=logger
+        )
+
+        current_device_id = shared_state['device_id_at_current_ip']
+
+        if device_id.lower() == current_device_id.lower():
             return ip
+        else:
+            logger.info(
+                "Found device ID %s which did not match" % current_device_id
+            )
     return None
 
 
