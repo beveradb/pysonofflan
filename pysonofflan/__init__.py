@@ -25,10 +25,24 @@ blocking internet access to their Sonoff devices.
 
 All common, shared functionality is available through `SonoffDevice` class:
 
-    x = SonoffDevice("192.168.1.1")
-    print(x.sys_info)
+    x = SonoffSwitch("192.168.1.50")
 
-For device type specific actions `SonoffSwitch` must be used instead.
+Upon instantiating the SonoffSwitch class, a connection is
+initiated and device state is populated, but no further action is taken.
+
+For most use cases, you'll want to make use of the `callback_after_update`
+parameter to send a command to the device after a connection has been
+initialised, for example:
+
+    async def state_callback(device):
+        if device.basic_info is not None:
+            print("ON" if device.is_on else "OFF")
+            device.shutdown_event_loop()
+
+    SonoffSwitch(
+        host="192.168.1.50",
+        callback_after_update=state_callback
+    )
 
 Module-specific errors are raised as Exceptions and are expected
 to be handled by the user of the library.
@@ -37,6 +51,7 @@ to be handled by the user of the library.
 __author__ = """Andrew Beveridge"""
 __email__ = 'andrew@beveridge.uk'
 __version__ = '0.1.0'
+__url__ = 'https://github.com/beveradb/pysonofflan'
 
 # flake8: noqa
 from .client import SonoffLANModeClient
