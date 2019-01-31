@@ -8,7 +8,8 @@ coverage==4.5.2
 Sphinx==1.8.3
 twine==1.12.1
 pytest>=4.2.0
-git+git://github.com/michaeljoseph/changes@master
+changes>=0.7.0
 click>=7.0
 restructuredtext-lint>=1.2.2
 collective.checkdocs>=0.2
+python-coveralls>=2.9.1

@@ -27,7 +27,8 @@ setup(
         'Programming Language :: Python :: 3.6',
         'Programming Language :: Python :: 3.7',
     ],
-    description="Interface for Sonoff devices running original Itead firmware, in LAN mode.",
+    description="Interface for Sonoff devices running original Itead "
+                "firmware, in LAN mode.",
     entry_points={
         'console_scripts': [
             'pysonofflan=pysonofflan.cli:cli',
