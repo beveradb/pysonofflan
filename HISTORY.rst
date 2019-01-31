@@ -5,6 +5,12 @@ History
 0.1.2 (2019-01-31)
 ------------------
 
+* Updated README layout
+* Added coveralls config for travis and CHANGELOG symlink
+
+0.1.2 (2019-01-31)
+------------------
+
 * Fixed documentation build for ReadTheDocs
 * Fixed restructuredtext in history which was breaking PyPi formatting
 
