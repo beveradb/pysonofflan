@@ -5,5 +5,5 @@ version: 2
 python:
   version: 3.5
   install:
-     - method: pip
+     - method: setuptools
        path: .
