@@ -2,6 +2,19 @@
 History
 =======
 
+0.1.2 (2019-01-31)
+------------------
+
+* Fixed documentation build for ReadTheDocs
+* Fixed restructuredtext in history which was breaking PyPi formatting
+
+0.1.1 (2019-01-30)
+------------------
+
+* Improved discovery logging
+* Added documentation
+* Fixed tests
+
 0.1.0 (2019-01-27)
 ------------------
 
