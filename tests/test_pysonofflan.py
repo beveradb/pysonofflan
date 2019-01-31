@@ -22,7 +22,7 @@ class TestPysonofflan(unittest.TestCase):
         """Test the CLI."""
         runner = CliRunner()
         result = runner.invoke(cli.cli)
-        assert 'No host name given - try discovery mode' in result.output
+        assert 'No host name given, see usage below' in result.output
 
     def test_cli_invalid_arg(self):
         """Test the CLI."""
@@ -47,7 +47,7 @@ class TestPysonofflan(unittest.TestCase):
         """Test the CLI."""
         runner = CliRunner()
         result = runner.invoke(cli.cli, ['state'])
-        assert 'No host name given' in result.output
+        assert 'No host name given, see usage below' in result.output
 
     def test_unconnectable_host_state(self):
         """Test the CLI."""
