@@ -58,6 +58,12 @@ Features
 * Listen for state changes announced by the device (e.g. by physical switch)
 * Activate inching/momentary device, with variable ON time (e.g. 1s)
 
+Install
+------------------
+::
+
+    $ pip install pysonofflan
+
 Command-Line Usage
 ------------------
 ::
