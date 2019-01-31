@@ -13,7 +13,7 @@ with open('HISTORY.rst') as history_file:
 
 requirements = ['Click>=7.0', 'click_log', 'websockets']
 setup_requirements = []
-test_requirements = []
+test_requirements = ['pytest', 'tox', 'python-coveralls']
 
 setup(
     author="Andrew Beveridge",
