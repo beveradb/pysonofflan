@@ -7,6 +7,10 @@ pySonoffLAN
     :target: https://pypi.python.org/pypi/pysonofflan
     :alt: Latest PyPi Release
 
+.. image:: https://img.shields.io/pypi/pyversions/pysonofflan.svg?style=flat
+    :target: https://pypi.python.org/pypi/pysonofflan
+    :alt: Supported Python Versions
+
 .. image:: https://img.shields.io/travis/beveradb/pysonofflan.svg
     :target: https://travis-ci.org/beveradb/pysonofflan
     :alt: Build Status
