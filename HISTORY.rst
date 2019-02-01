@@ -1,6 +1,10 @@
 History
 =======
 
+0.1.5 (2019-02-01)
+------------------
+* Bumped version after tweaking build workflow
+
 0.1.4 (2019-01-31)
 ------------------
 
