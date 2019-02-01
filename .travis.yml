@@ -5,7 +5,7 @@ python:
 - 3.5
 sudo: required
 dist: xenial
-install: pip install -U tox-travis
+install: pip install -U tox-travis coveralls
 script: tox
 after_success:
   - coveralls
