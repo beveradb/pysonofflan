@@ -92,7 +92,7 @@ def discover():
         "on the local network, please wait..."
     )
     found_devices = asyncio.get_event_loop().run_until_complete(
-        Discover.discover()).items()
+        Discover.discover(logger)).items()
     for ip, found_device_id in found_devices:
         logger.info("Found Sonoff LAN Mode device at IP %s" % ip)
 
@@ -105,7 +105,7 @@ def find_host_from_device_id(device_id):
         "Trying to discover %s by scanning for devices "
         "on local network, please wait..." % device_id)
     found_devices = asyncio.get_event_loop().run_until_complete(
-        Discover.discover()).items()
+        Discover.discover(logger)).items()
     for ip, _ in found_devices:
         logger.info("Found Sonoff LAN Mode device at IP %s, attempting to "
                     "read state to get device ID" % ip)
