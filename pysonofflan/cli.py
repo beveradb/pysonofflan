@@ -59,7 +59,8 @@ pass_config = click.make_pass_decorator(dict, ensure=True)
               help='Number of seconds of "on" time if this is an '
                    'Inching/Momentary switch.')
 @click.pass_context
-@click_log.simple_verbosity_option(logger)
+@click_log.simple_verbosity_option(logger, '--loglevel', '-l')
+@click.version_option()
 def cli(ctx, host, device_id, inching):
     """A cli tool for controlling Sonoff Smart Switches/Plugs in LAN Mode."""
     if ctx.invoked_subcommand == "discover":
