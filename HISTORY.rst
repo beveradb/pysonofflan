@@ -1,7 +1,7 @@
 History
 =======
 
-0.2.0 (2019-02-01)
+0.2.0 (2019-02-02)
 ------------------
 * Rewrote discovery to use multiple threads so it only takes 1 second
 * Improved logging in client class with logger passed through
