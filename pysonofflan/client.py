@@ -8,8 +8,6 @@ from typing import Dict, Union, Callable, Awaitable
 import websockets
 from websockets.framing import OP_CLOSE, parse_close, OP_PING, OP_PONG
 
-_LOGGER = logging.getLogger(__name__)
-
 
 class SonoffLANModeClientProtocol(websockets.WebSocketClientProtocol):
     """Customised WebSocket client protocol to ignore pong payload match."""
@@ -18,6 +16,8 @@ class SonoffLANModeClientProtocol(websockets.WebSocketClientProtocol):
         """
         Copied from websockets.WebSocketCommonProtocol to change pong handling
         """
+        logger = logging.getLogger(__name__)
+
         while True:
             frame = await self.read_frame(max_size)
 
@@ -28,7 +28,7 @@ class SonoffLANModeClientProtocol(websockets.WebSocketClientProtocol):
 
             elif frame.opcode == OP_PING:
                 ping_hex = binascii.hexlify(frame.data).decode() or '[empty]'
-                _LOGGER.debug(
+                logger.debug(
                     "%s - received ping, sending pong: %s", self.side, ping_hex
                 )
                 await self.pong(frame.data)
@@ -39,13 +39,13 @@ class SonoffLANModeClientProtocol(websockets.WebSocketClientProtocol):
                     ping_id, pong_waiter = self.pings.popitem(0)
                     ping_hex = binascii.hexlify(ping_id).decode() or '[empty]'
                     pong_waiter.set_result(None)
-                    _LOGGER.debug(
+                    logger.debug(
                         "%s - received pong, clearing most recent ping: %s",
                         self.side,
                         ping_hex
                     )
                 else:
-                    _LOGGER.debug(
+                    logger.debug(
                         "%s - received pong, but no pings to clear",
                         self.side
                     )
@@ -73,50 +73,63 @@ class SonoffLANModeClient:
                  event_handler: Callable[[str], Awaitable[None]],
                  port: int = DEFAULT_PORT,
                  ping_interval: int = DEFAULT_PING_INTERVAL,
-                 timeout: int = DEFAULT_TIMEOUT):
+                 timeout: int = DEFAULT_TIMEOUT,
+                 logger: logging.Logger = None):
         self.host = host
         self.port = port
         self.ping_interval = ping_interval
         self.timeout = timeout
+        self.logger = logger
         self.websocket = None
         self.keep_running = True
         self.event_handler = event_handler
+        self.connected = False
+
+        if self.logger is None:
+            self.logger = logging.getLogger(__name__)
 
     async def connect(self):
         """
         Connect to the Sonoff LAN Mode Device and set up communication channel.
         """
         websocket_address = 'ws://%s:%s/' % (self.host, self.port)
-        _LOGGER.debug('Connecting to websocket address: %s', websocket_address)
+        self.logger.debug('Connecting to websocket address: %s',
+                          websocket_address)
 
-        self.websocket = await websockets.connect(
-            websocket_address,
-            ping_interval=self.ping_interval,
-            ping_timeout=self.timeout,
-            subprotocols=['chat'],
-            klass=SonoffLANModeClientProtocol
-        )
+        try:
+            self.websocket = await websockets.connect(
+                websocket_address,
+                ping_interval=self.ping_interval,
+                ping_timeout=self.timeout,
+                subprotocols=['chat'],
+                klass=SonoffLANModeClientProtocol
+            )
+            self.connected = True
+        except websockets.InvalidMessage as ex:
+            self.logger.error('SonoffLANModeClient connection failed: %s' % ex)
+            raise ex
 
     async def close_connection(self):
-        _LOGGER.debug('Closing websocket from client close_connection')
+        self.logger.debug('Closing websocket from client close_connection')
+        self.connected = False
         if self.websocket is not None:
             await self.websocket.close()
 
     async def receive_message_loop(self):
         try:
             while self.keep_running:
-                _LOGGER.debug('Waiting for messages on websocket')
+                self.logger.debug('Waiting for messages on websocket')
                 message = await self.websocket.recv()
                 await self.event_handler(message)
-                _LOGGER.debug('Message passed to handler, should loop now')
+                self.logger.debug('Message passed to handler, should loop now')
         finally:
-            _LOGGER.debug('receive_message_loop finally block reached: '
-                          'closing websocket')
+            self.logger.debug('receive_message_loop finally block reached: '
+                              'closing websocket')
             if self.websocket is not None:
                 await self.websocket.close()
 
     async def send_online_message(self):
-        _LOGGER.debug('Sending user online message over websocket')
+        self.logger.debug('Sending user online message over websocket')
 
         json_data = json.dumps(self.get_user_online_payload())
         await self.websocket.send(json_data)
@@ -124,8 +137,8 @@ class SonoffLANModeClient:
         response_message = await self.websocket.recv()
         response = json.loads(response_message)
 
-        _LOGGER.debug('Received user online response:')
-        _LOGGER.debug(response)
+        self.logger.debug('Received user online response:')
+        self.logger.debug(response)
         # Example user online response:
         # {
         #     "error": 0,
@@ -143,10 +156,11 @@ class SonoffLANModeClient:
             ('error' in response and response['error'] == 0)
             and 'deviceid' in response
         ):
-            _LOGGER.debug('Websocket connected and accepted online user OK')
+            self.logger.debug(
+                'Websocket connected and accepted online user OK')
             return True
         else:
-            _LOGGER.error('Websocket connection online user failed')
+            self.logger.error('Websocket connection online user failed')
 
     async def send(self, request: Union[str, Dict]):
         """
@@ -159,7 +173,7 @@ class SonoffLANModeClient:
         if isinstance(request, dict):
             request = json.dumps(request)
 
-        _LOGGER.debug('Sending websocket message: %s', request)
+        self.logger.debug('Sending websocket message: %s', request)
         await self.websocket.send(request)
 
     @staticmethod

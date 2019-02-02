@@ -1,11 +1,14 @@
 import ipaddress
 import logging
 import socket
+import threading
 from itertools import chain
 from typing import Dict
 
 
 class Discover:
+    SONOFF_PORT = 8081
+
     @staticmethod
     async def discover(logger=None) -> Dict[str, str]:
         """
@@ -19,9 +22,9 @@ class Discover:
         if logger is None:
             logger = logging.getLogger(__name__)
 
-        logger.debug("Attempting connection to all IPs on local network. "
-                     "This will take approximately 1 minute, please wait...")
+        logger.debug("Attempting connection to all IPs on local network.")
         devices = {}
+        threads = []
 
         try:
             local_ip_ranges = chain(
@@ -30,15 +33,40 @@ class Discover:
                 ipaddress.IPv4Network('192.168.1.0/24')
             )
 
+            # Spawn thread per IP address to scan
             for ip in local_ip_ranges:
-                logger.debug("Attempting connection to IP: %s" % ip)
-                sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-                sock.settimeout(0.1)
-                result = sock.connect_ex((str(ip), 8081))
-                if result == 0:
-                    logger.debug("Found open 8081 port at local IP: %s" % ip)
-                    devices[ip] = ip
+                t = threading.Thread(target=Discover.probe_ip,
+                                     args=(logger, ip, devices))
+                threads.append(t)
+
+            # Start all threads
+            for thread in threads:
+                thread.start()
+
+            # Lock the main thread until all threads complete
+            for thread in threads:
+                thread.join()
+
         except Exception as ex:
             logger.error("Caught Exception: %s" % ex, exc_info=False)
 
         return devices
+
+    @staticmethod
+    def probe_ip(logger, ip, devices):
+        logger.debug(
+            "Attempting connection to IP: %s on port %s" % (
+                ip, Discover.SONOFF_PORT)
+        )
+        tcp_sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        tcp_sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        tcp_sock.settimeout(0.5)
+        result = tcp_sock.connect_ex((str(ip), Discover.SONOFF_PORT))
+        if result == 0:
+            logger.debug(
+                "Found open port %s at local IP: %s" % (
+                    Discover.SONOFF_PORT,
+                    ip
+                )
+            )
+            devices[ip] = ip

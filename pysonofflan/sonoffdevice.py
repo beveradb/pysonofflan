@@ -49,7 +49,8 @@ class SonoffDevice(object):
             host,
             self.handle_message,
             ping_interval=ping_interval,
-            timeout=timeout
+            timeout=timeout,
+            logger=self.logger
         )
 
         try:
@@ -83,6 +84,9 @@ class SonoffDevice(object):
             self.logger.debug(
                 'setup_connection yielding to receive_message_loop()')
             await self.client.receive_message_loop()
+        except websockets.InvalidMessage as ex:
+            self.logger.error('Unable to connect: %s' % ex)
+            self.shutdown_event_loop()
         except ConnectionRefusedError:
             self.logger.error('Unable to connect: connection refused')
             self.shutdown_event_loop()
