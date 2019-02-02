@@ -1,6 +1,10 @@
 History
 =======
 
+0.2.1 (2019-02-02)
+------------------
+* Made websocket library usage backwards-compatible with older versions
+
 0.2.0 (2019-02-02)
 ------------------
 * Rewrote discovery to use multiple threads so it only takes 1 second
