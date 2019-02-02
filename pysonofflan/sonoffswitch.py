@@ -33,6 +33,7 @@ class SonoffSwitch(SonoffDevice):
                  shared_state: Dict = None,
                  inching_seconds: int = None,
                  logger=None,
+                 loop=None,
                  ping_interval=SonoffLANModeClient.DEFAULT_PING_INTERVAL,
                  timeout=SonoffLANModeClient.DEFAULT_TIMEOUT,
                  context: str = None) -> None:
@@ -50,6 +51,7 @@ class SonoffSwitch(SonoffDevice):
             host=host,
             callback_after_update=self.pre_callback_after_update,
             logger=self.logger,
+            loop=loop,
             shared_state=shared_state,
             ping_interval=ping_interval,
             timeout=timeout,
@@ -126,7 +128,9 @@ class SonoffSwitch(SonoffDevice):
         self.logger.debug("shutdown_inching running")
         await self.turn_off()
         await asyncio.sleep(1)
-        await self.parent_callback_after_update(self)
+
+        if self.parent_callback_after_update is not None:
+            await self.parent_callback_after_update(self)
         self.shutdown_event_loop()
 
     def callback_to_turn_off_inching(self):
@@ -161,4 +165,6 @@ class SonoffSwitch(SonoffDevice):
                 await self.turn_on()
         else:
             self.logger.debug("Not inching switch, calling parent callback")
-            await self.parent_callback_after_update(self)
+
+            if self.parent_callback_after_update is not None:
+                await self.parent_callback_after_update(self)

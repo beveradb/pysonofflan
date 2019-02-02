@@ -18,6 +18,7 @@ class SonoffDevice(object):
                  callback_after_update: Callable[..., Awaitable[None]] = None,
                  shared_state: Dict = None,
                  logger=None,
+                 loop=None,
                  ping_interval=SonoffLANModeClient.DEFAULT_PING_INTERVAL,
                  timeout=SonoffLANModeClient.DEFAULT_TIMEOUT,
                  context: str = None) -> None:
@@ -35,6 +36,7 @@ class SonoffDevice(object):
         self.params = None
         self.send_updated_params_task = None
         self.params_updated_event = None
+        self.loop = loop
 
         if logger is None:
             self.logger = logging.getLogger(__name__)
@@ -51,7 +53,9 @@ class SonoffDevice(object):
         )
 
         try:
-            self.loop = asyncio.new_event_loop()
+            if self.loop is None:
+                self.loop = asyncio.new_event_loop()
+
             asyncio.set_event_loop(self.loop)
 
             self.params_updated_event = asyncio.Event()
