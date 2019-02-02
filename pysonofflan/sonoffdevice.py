@@ -33,7 +33,7 @@ class SonoffDevice(object):
         self.context = context
         self.shared_state = shared_state
         self.basic_info = None
-        self.params = None
+        self.params = {}
         self.send_updated_params_task = None
         self.params_updated_event = None
         self.loop = loop
@@ -63,7 +63,10 @@ class SonoffDevice(object):
                 self.send_updated_params_loop()
             )
 
-            self.loop.run_until_complete(self.setup_connection())
+            if not self.loop.is_running():
+                self.loop.run_until_complete(self.setup_connection())
+            else:
+                asyncio.ensure_future(self.setup_connection())
 
         except asyncio.CancelledError:
             self.logger.debug('SonoffDevice loop ended, returning')
