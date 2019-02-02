@@ -61,7 +61,8 @@ class TestPysonofflan(unittest.TestCase):
         """Test the CLI."""
         runner = CliRunner()
         result = runner.invoke(cli.cli, ['--host', '127.0.0.100', 'state'])
-        assert 'Initialising SonoffSwitch with host 127.0.0.100' in result.output
+        assert 'Initialising SonoffSwitch with host 127.0.0.100' in \
+               result.output
         assert 'Unable to connect' in result.output
 
     def test_cli_discover(self):

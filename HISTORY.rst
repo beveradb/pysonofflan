@@ -1,7 +1,15 @@
 History
 =======
 
+0.2.0 (2019-02-01)
+------------------
+* Rewrote discovery to use multiple threads so it only takes 1 second
+* Improved logging in client class with logger passed through
+* Improved handling of event loop to allow usage within existing async codebase
+* Added --version argument to CLI
+
 0.1.7 (2019-02-01)
+------------------
 * Migrated from bumpversion to bump2version for cleaner release process
 
 0.1.6 (2019-02-01)
