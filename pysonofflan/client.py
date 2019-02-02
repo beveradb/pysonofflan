@@ -97,13 +97,21 @@ class SonoffLANModeClient:
                           websocket_address)
 
         try:
-            self.websocket = await websockets.connect(
-                websocket_address,
-                ping_interval=self.ping_interval,
-                ping_timeout=self.timeout,
-                subprotocols=['chat'],
-                klass=SonoffLANModeClientProtocol
-            )
+            if float(websockets.__version__) >= 7.0:
+                self.websocket = await websockets.connect(
+                    websocket_address,
+                    ping_interval=self.ping_interval,
+                    ping_timeout=self.timeout,
+                    subprotocols=['chat'],
+                    klass=SonoffLANModeClientProtocol
+                )
+            else:
+                self.websocket = await websockets.connect(
+                    websocket_address,
+                    timeout=self.timeout,
+                    subprotocols=['chat'],
+                    klass=SonoffLANModeClientProtocol
+                )
             self.connected = True
         except websockets.InvalidMessage as ex:
             self.logger.error('SonoffLANModeClient connection failed: %s' % ex)
