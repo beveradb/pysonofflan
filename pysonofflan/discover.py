@@ -54,6 +54,14 @@ class Discover:
 
     @staticmethod
     def probe_ip(logger, ip, devices):
+        """
+        Attempt connection to IP address on specified port, adding this IP
+        to the devices dict if the connection was successful
+
+        :param logger: Logger instance to output debug messages on
+        :param ip: IP address to test
+        :param devices: Dict to insert IP into if connectable
+        """
         logger.debug(
             "Attempting connection to IP: %s on port %s" % (
                 ip, Discover.SONOFF_PORT)
