@@ -10,8 +10,8 @@ from click.testing import CliRunner
 from pysonofflan import cli
 
 
-class TestPysonofflan(unittest.TestCase):
-    """Tests for `pysonofflan` package."""
+class TestCLI(unittest.TestCase):
+    """Tests for pysonofflan CLI interface."""
 
     def setUp(self):
         """Set up test fixtures, if any."""
@@ -57,7 +57,7 @@ class TestPysonofflan(unittest.TestCase):
         result = runner.invoke(cli.cli, ['state'])
         assert 'No host name given, see usage below' in result.output
 
-    def test_unconnectable_host_state(self):
+    def test_cli_unconnectable_host_state(self):
         """Test the CLI."""
         runner = CliRunner()
         result = runner.invoke(cli.cli, ['--host', '127.0.0.100', 'state'])
