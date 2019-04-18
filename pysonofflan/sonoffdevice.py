@@ -75,31 +75,42 @@ class SonoffDevice(object):
     async def setup_connection(self):
         self.logger.debug('setup_connection is active on the event loop')
 
-        try:
-            self.logger.debug('setup_connection yielding to connect()')
-            await self.client.connect()
-            self.logger.debug(
-                'setup_connection yielding to send_online_message()')
-            await self.client.send_online_message()
-            self.logger.debug(
-                'setup_connection yielding to receive_message_loop()')
-            await self.client.receive_message_loop()
-        except websockets.InvalidMessage as ex:
-            self.logger.error('Unable to connect: %s' % ex)
-            self.shutdown_event_loop()
-        except ConnectionRefusedError:
-            self.logger.error('Unable to connect: connection refused')
-            self.shutdown_event_loop()
-        except websockets.exceptions.ConnectionClosed:
-            self.logger.error('Connection closed unexpectedly')
-            self.shutdown_event_loop()
-        finally:
-            self.logger.debug(
-                'finally: closing websocket from setup_connection')
-            await self.client.close_connection()
+        waits=0
+        
+        while True:
+                                
+            for tries in range(1,3):                                                            # MJS: upto 3 immediate retries before a wait            
+           
+                try:
+                    self.logger.debug('setup_connection yielding to connect(), try: %i, waits %i', tries, waits)
+                    await self.client.connect()
+                    self.logger.debug(
+                        'setup_connection yielding to send_online_message()')
+                    await self.client.send_online_message()
+                    self.logger.debug(
+                        'setup_connection yielding to receive_message_loop()')
+                    await self.client.receive_message_loop()
 
-        self.logger.debug('setup_connection resumed, exiting')
-
+                except websockets.InvalidMessage as ex:
+                    self.logger.error('Unable to connect: %s' % ex)
+                    break                                                                       # wait before rety
+                except ConnectionRefusedError:
+                    self.logger.error('Unable to connect: connection refused')
+                    break                                                                       # wait before retry
+                except websockets.exceptions.ConnectionClosed:
+                    self.logger.error('Connection closed unexpectedly in setup_connection')
+                                                                                                # retry immediately
+                finally:
+                    self.logger.debug('finally: closing websocket from setup_connection')
+                    await self.client.close_connection()
+            
+            self.logger.debug('waiting 60 seconds before trying again')
+            await asyncio.sleep(60)
+            waits+=1        
+        
+        self.shutdown_event_loop() # this is causing HA to hang and sometimes not be restartable 
+        self.logger.debug('existing setup_connection()')
+                
     async def send_updated_params_loop(self):
         self.logger.debug(
             'send_updated_params_loop is active on the event loop')
@@ -116,8 +127,17 @@ class SonoffDevice(object):
                     self.device_id,
                     self.params
                 )
-                await self.client.send(update_message)
-                self.params_updated_event.clear()
+                self.params_updated_event.clear() # MJS: Clear event before we try send, this is so new event whilst send is blocked is stacked up
+                
+                try:
+                    await self.client.send(update_message)
+                
+                except websockets.exceptions.ConnectionClosed:                                  # MJS: Added exception handling so to avoid terminating the 
+                    self.logger.warn('Connection closed unexpectedly in send()')
+                    
+                except Exception as ex:
+                    self.logger.error('Unexpected error in send(): %s', format(ex) )
+
                 self.logger.debug('Update message sent, event cleared, should '
                                   'loop now')
         finally:
