@@ -121,11 +121,8 @@ class SonoffLANModeClient:
         self.logger.debug('Closing websocket from client close_connection')
         self.connected = False
         if self.websocket is not None:
-            self.logger.debug('calling websocket.close')
             await self.websocket.close()
-            self.websocket = None                       # MJS: Ensure we cannot close multiple times
-            self.logger.debug('websocket was closed')
-            
+
     async def receive_message_loop(self):
         try:
             while self.keep_running:
