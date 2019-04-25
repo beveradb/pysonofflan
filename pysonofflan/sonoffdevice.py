@@ -7,6 +7,7 @@ import json
 import logging
 from typing import Callable, Awaitable, Dict
 
+import traceback
 import websockets
 
 from .client import SonoffLANModeClient
@@ -34,106 +35,210 @@ class SonoffDevice(object):
         self.shared_state = shared_state
         self.basic_info = None
         self.params = {}
-        self.send_updated_params_task = None
+        self.pending_params = {}
+        self.old_params = {}                                            # store pending params to be used in retry
         self.params_updated_event = None
         self.loop = loop
+        self.tasks = []                                                 # store the tasks that this module create s in a sequence
+        self.new_loop = False                                           # use to decide if we should shutdown the loop on exit
 
         if logger is None:
             self.logger = logging.getLogger(__name__)
         else:
             self.logger = logger
 
-        self.logger.debug(
-            'Initializing SonoffLANModeClient class in SonoffDevice')
-        self.client = SonoffLANModeClient(
-            host,
-            self.handle_message,
-            ping_interval=ping_interval,
-            timeout=timeout,
-            logger=self.logger
-        )
-
         try:
             if self.loop is None:
+
+                self.new_loop = True
                 self.loop = asyncio.new_event_loop()
+                asyncio.set_event_loop(self.loop)
 
-            asyncio.set_event_loop(self.loop)
-
-            self.params_updated_event = asyncio.Event()
-            self.send_updated_params_task = self.loop.create_task(
-                self.send_updated_params_loop()
+            self.logger.debug(
+                'Initializing SonoffLANModeClient class in SonoffDevice')
+            self.client = SonoffLANModeClient(
+                host,
+                self.handle_message,
+                ping_interval=ping_interval,
+                timeout=timeout,
+                logger=self.logger
             )
 
-            if not self.loop.is_running():
-                self.loop.run_until_complete(self.setup_connection())
-            else:
-                asyncio.ensure_future(self.setup_connection())
+            self.message_received_event = asyncio.Event()
+            self.params_updated_event = asyncio.Event()
+
+            self.tasks.append(self.loop.create_task(self.send_updated_params_loop()))
+                        
+            self.tasks.append(self.loop.create_task(self.send_availability_loop()))
+            
+            self.setup_connection_task = self.loop.create_task(self.setup_connection(not self.new_loop))
+            self.tasks.append(self.setup_connection_task)
+
+            if self.new_loop:
+                self.loop.run_until_complete(self.setup_connection_task)
 
         except asyncio.CancelledError:
             self.logger.debug('SonoffDevice loop ended, returning')
 
-    async def setup_connection(self):
+    async def setup_connection(self, retry):
         self.logger.debug('setup_connection is active on the event loop')
+                                    
+        retry_count = 0
+    
+        while True:                                                                                   
+            connected = False
+            try:
+                self.logger.debug('setup_connection yielding to connect()')
+                await self.client.connect()
+                self.logger.debug(
+                    'setup_connection yielding to send_online_message()')
+                await self.client.send_online_message()
+
+                connected = True
+
+            except websockets.InvalidMessage as ex:
+                self.logger.warn('Unable to connect: %s' % ex)   
+                await self.wait_before_retry(retry_count)               
+            except ConnectionRefusedError:
+                self.logger.warn('Unable to connect: connection refused')                                                                     
+                await self.wait_before_retry(retry_count)    
+            except websockets.exceptions.ConnectionClosed:
+                self.logger.warn('Connection closed unexpectedly during setup')
+                await self.wait_before_retry(retry_count)
+            except OSError as ex:
+                self.logger.warn('OSError in setup_connection(): %s', format(ex) )
+                await self.wait_before_retry(retry_count)    
+            except Exception as ex:
+                self.logger.error('Unexpected error in setup_connection(): %s', format(ex) )
+                await self.wait_before_retry(retry_count)
+
+            if connected:
+                retry_count = 0                                                                     # reset retry count after successful connection
+                try: 
+                    self.logger.debug(
+                        'setup_connection yielding to receive_message_loop()')
+                    await self.client.receive_message_loop()
+                                                                                    
+                except websockets.InvalidMessage as ex:
+                    self.logger.warn('Unable to connect: %s' % ex)
+                except websockets.exceptions.ConnectionClosed:
+                    self.logger.warn('Connection closed unexpectedly in setup_connection')
+                except OSError as ex:
+                    self.logger.warn('OSError in receive_message_loop(): %s', format(ex) )
+                
+                except asyncio.CancelledError:
+                    self.logger.debug('receive_message_loop() cancelled' )
+
+                except Exception as ex:
+                    self.logger.error('Unexpected error in receive_message_loop(): %s', format(ex) )
+                
+                finally:
+                    self.logger.debug('finally: closing websocket from setup_connection')
+                    await self.client.close_connection()
+
+            if not retry:
+                break    
+
+            retry_count +=1
+
+        self.shutdown_event_loop()
+        self.logger.debug('exiting setup_connection()')
+
+    async def wait_before_retry(self, retry_count):
 
         try:
-            self.logger.debug('setup_connection yielding to connect()')
-            await self.client.connect()
-            self.logger.debug(
-                'setup_connection yielding to send_online_message()')
-            await self.client.send_online_message()
-            self.logger.debug(
-                'setup_connection yielding to receive_message_loop()')
-            await self.client.receive_message_loop()
-        except websockets.InvalidMessage as ex:
-            self.logger.error('Unable to connect: %s' % ex)
-            self.shutdown_event_loop()
-        except ConnectionRefusedError:
-            self.logger.error('Unable to connect: connection refused')
-            self.shutdown_event_loop()
-        except websockets.exceptions.ConnectionClosed:
-            self.logger.error('Connection closed unexpectedly')
-            self.shutdown_event_loop()
-        finally:
-            self.logger.debug(
-                'finally: closing websocket from setup_connection')
-            await self.client.close_connection()
 
-        self.logger.debug('setup_connection resumed, exiting')
+            wait_times = [0.5,1,2,5,10,30,60]
+
+            if retry_count >= len(wait_times):
+                retry_count = len(wait_times) -1
+
+            wait_time = wait_times[retry_count]
+
+            self.logger.debug('Waiting %i seconds before retry', wait_time)
+
+            await asyncio.sleep(wait_time)
+
+        except Exception as ex:
+            self.logger.error('Unexpected error in wait_before_retry(): %s', format(ex) )
+                
+    async def send_availability_loop(self):
+
+        try:
+            while True:
+                await self.client.disconnected_event.wait()
+
+                if self.callback_after_update is not None:
+                    await self.callback_after_update(self)
+                    self.client.disconnected_event.clear()
+        finally:
+            self.logger.debug('exiting send_availability_loop()')
 
     async def send_updated_params_loop(self):
         self.logger.debug(
             'send_updated_params_loop is active on the event loop')
 
         try:
+
             self.logger.debug(
                 'Starting loop waiting for device params to change')
-            while self.client.keep_running:
+            while True:                                                     
                 self.logger.debug(
                     'send_updated_params_loop now awaiting event')
+
                 await self.params_updated_event.wait()
+
+                self.message_received_event.clear()
+                
+                await self.client.connected_event.wait()
+                self.logger.debug('Connected!')
+
+                self.params = self.pending_params
 
                 update_message = self.client.get_update_payload(
                     self.device_id,
-                    self.params
-                )
-                await self.client.send(update_message)
-                self.params_updated_event.clear()
-                self.logger.debug('Update message sent, event cleared, should '
-                                  'loop now')
-        finally:
-            self.logger.debug(
-                'send_updated_params_loop finally block reached: '
-                'closing websocket')
-            await self.client.close_connection()
+                    self.pending_params
+                )                  
 
-        self.logger.debug(
-            'send_updated_params_loop resumed outside loop, exiting')
+                try:
+                    await self.client.send(update_message)                    
+                    await asyncio.wait_for(self.message_received_event.wait(), 5)
+
+                    self.pending_params = {}    
+                    self.params_updated_event.clear() 
+                    self.logger.debug('Update message sent, event cleared, should '
+                                'loop now')
+
+                except websockets.exceptions.ConnectionClosed:                                   
+                    self.logger.error('Connection closed unexpectedly in send()')
+                except asyncio.TimeoutError:                     
+                    self.logger.warn('Update message not received, close connection, then loop')
+                    self.params = self.old_params
+                    await self.client.close_connection()                                        # closing connection causes cascade failure in setup_connection and reconnect
+                except OSError as ex:
+                    self.logger.warn('OSError in send(): %s', format(ex) )
+
+                except asyncio.CancelledError:
+                    self.logger.debug('send_updated_params_loop cancelled')
+
+                except Exception as ex:
+                    self.logger.error('Unexpected error in send(): %s', format(ex) )
+
+        except asyncio.CancelledError:
+            self.logger.debug('send_updated_params_loop cancelled')
+
+        except Exception as ex:
+            self.logger.error('Unexpected error in send(): %s', format(ex) )
+
+        finally:
+            self.logger.debug('send_updated_params_loop finally block reached')
 
     def update_params(self, params):
         self.logger.debug(
             'Scheduling params update message to device: %s' % params
-        )
-        self.params = params
+        )    
+        self.old_params = self.params
+        self.pending_params = params
         self.params_updated_event.set()
 
     async def handle_message(self, message):
@@ -141,20 +246,32 @@ class SonoffDevice(object):
         Receive message sent by the device and handle it, either updating
         state or storing basic device info
         """
+        
+        self.shared_state = message
         response = json.loads(message)
 
         if (
             ('error' in response and response['error'] == 0)
             and 'deviceid' in response
         ):
+            if self.client.connected_event.is_set():
+                self.message_received_event.set()             # only mark message as accepted if we are already online (otherwise this is an initial connection message)
+ 
             self.logger.debug(
                 'Received basic device info, storing in instance')
             self.basic_info = response
+
+            if self.callback_after_update is not None:
+                await self.callback_after_update(self)
+
         elif 'action' in response and response['action'] == "update":
+ 
             self.logger.debug(
                 'Received update from device, updating internal state to: %s'
                 % response['params'])
             self.params = response['params']
+            self.client.connected_event.set()
+            self.client.disconnected_event.clear()
 
             if self.callback_after_update is not None:
                 await self.callback_after_update(self)
@@ -164,10 +281,7 @@ class SonoffDevice(object):
             raise Exception('Unknown message received from device')
 
     def shutdown_event_loop(self):
-        self.logger.debug(
-            'shutdown_event_loop called, setting keep_running to '
-            'False')
-        self.client.keep_running = False
+        self.logger.debug('shutdown_event_loop called')
 
         try:
             # Hide Cancelled Error exceptions during shutdown
@@ -182,32 +296,43 @@ class SonoffDevice(object):
             # Handle shutdown gracefully by waiting for all tasks
             # to be cancelled
             tasks = asyncio.gather(
-                *asyncio.all_tasks(loop=self.loop),
+                *self.tasks,
                 loop=self.loop,
                 return_exceptions=True
             )
-
-            tasks.add_done_callback(lambda t: self.loop.stop())
+           
+            if self.new_loop:
+                tasks.add_done_callback(lambda t: self.loop.stop())
+    
             tasks.cancel()
 
             # Keep the event loop running until it is either
             # destroyed or all tasks have really terminated
-            while (
-                not tasks.done()
-                and not self.loop.is_closed()
-                and not self.loop.is_running()
-            ):
-                self.loop.run_forever()
+
+            if self.new_loop:
+                while (
+                    not tasks.done()
+                    and not self.loop.is_closed()
+                    and not self.loop.is_running()
+                ):
+                    self.loop.run_forever()
+        
+        except Exception as ex:
+                self.logger.error('Unexpected error in shutdown_event_loop(): %s', format(ex) )
+
         finally:
-            if (
-                hasattr(self.loop, "shutdown_asyncgens")
-                and not self.loop.is_running()
-            ):
-                # Python 3.5
-                self.loop.run_until_complete(
-                    self.loop.shutdown_asyncgens()
-                )
-                self.loop.close()
+            if self.new_loop:
+
+                if (
+                    hasattr(self.loop, "shutdown_asyncgens")
+                    and not self.loop.is_running()
+                ):
+                    # Python 3.5
+                    self.loop.run_until_complete(
+                        self.loop.shutdown_asyncgens()
+                    )
+                    self.loop.close()
+            
 
     @property
     def device_id(self) -> str:
@@ -256,3 +381,8 @@ class SonoffDevice(object):
         return "<%s at %s>" % (
             self.__class__.__name__,
             self.host)
+
+    @property
+    def available(self) -> bool:
+
+        return self.client.connected_event.is_set()

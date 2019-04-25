@@ -143,9 +143,10 @@ def state(config: dict):
 
     async def state_callback(device):
         if device.basic_info is not None:
-            print_device_details(device)
+            if device.available:
+                print_device_details(device)
 
-            device.shutdown_event_loop()
+                device.shutdown_event_loop()
 
     logger.info("Initialising SonoffSwitch with host %s" % config['host'])
     SonoffSwitch(
@@ -215,21 +216,27 @@ def switch_device(host, inching, new_state):
 
     async def update_callback(device: SonoffSwitch):
         if device.basic_info is not None:
-            if inching is None:
-                logger.info("\nInitial state:")
-                print_device_details(device)
 
-                device.client.keep_running = False
-                if new_state == "on":
-                    await device.turn_on()
+            if device.available:
+
+                if inching is None:
+                    print_device_details(device)
+
+                    if device.is_on:
+                        if new_state == "on":
+                            device.client.keep_running = False
+                        else:
+                            await device.turn_off()
+                            
+                    elif device.is_off:
+                        if new_state == "off":
+                            device.client.keep_running = False
+                        else:
+                            await device.turn_on()
+
                 else:
-                    await device.turn_off()
-            else:
-                logger.info("Inching device activated by switching ON for "
-                            "%ss" % inching)
-
-            logger.info("\nNew state:")
-            print_device_details(device)
+                    logger.info("Inching device activated by switching ON for "
+                                "%ss" % inching)
 
     SonoffSwitch(
         host=host,

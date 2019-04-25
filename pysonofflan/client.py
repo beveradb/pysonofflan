@@ -4,6 +4,7 @@ import logging
 import random
 import time
 from typing import Dict, Union, Callable, Awaitable
+import asyncio
 
 import websockets
 from websockets.framing import OP_CLOSE, parse_close, OP_PING, OP_PONG
@@ -80,10 +81,12 @@ class SonoffLANModeClient:
         self.ping_interval = ping_interval
         self.timeout = timeout
         self.logger = logger
-        self.websocket = None
         self.keep_running = True
+        self.websocket = None
         self.event_handler = event_handler
-        self.connected = False
+        self.connected_event = asyncio.Event()
+        self.disconnected_event = asyncio.Event()
+
 
         if self.logger is None:
             self.logger = logging.getLogger(__name__)
@@ -112,17 +115,20 @@ class SonoffLANModeClient:
                     subprotocols=['chat'],
                     klass=SonoffLANModeClientProtocol
                 )
-            self.connected = True
         except websockets.InvalidMessage as ex:
             self.logger.error('SonoffLANModeClient connection failed: %s' % ex)
             raise ex
 
     async def close_connection(self):
         self.logger.debug('Closing websocket from client close_connection')
-        self.connected = False
+        self.connected_event.clear()
+        self.disconnected_event.set()
         if self.websocket is not None:
+            self.logger.debug('calling websocket.close')
             await self.websocket.close()
-
+            self.websocket = None                       # Ensure we cannot close multiple times
+            self.logger.debug('websocket was closed')
+            
     async def receive_message_loop(self):
         try:
             while self.keep_running:
@@ -131,10 +137,7 @@ class SonoffLANModeClient:
                 await self.event_handler(message)
                 self.logger.debug('Message passed to handler, should loop now')
         finally:
-            self.logger.debug('receive_message_loop finally block reached: '
-                              'closing websocket')
-            if self.websocket is not None:
-                await self.websocket.close()
+            self.logger.debug('receive_message_loop finally block reached')
 
     async def send_online_message(self):
         self.logger.debug('Sending user online message over websocket')
