@@ -35,12 +35,11 @@ class SonoffDevice(object):
         self.shared_state = shared_state
         self.basic_info = None
         self.params = {}
-        self.pending_params = {}
-        self.old_params = {}                                            # store pending params to be used in retry
         self.params_updated_event = None
         self.loop = loop
         self.tasks = []                                                 # store the tasks that this module create s in a sequence
         self.new_loop = False                                           # use to decide if we should shutdown the loop on exit
+        self.messages_received = 0
 
         if logger is None:
             self.logger = logging.getLogger(__name__)
@@ -178,33 +177,35 @@ class SonoffDevice(object):
         self.logger.debug(
             'send_updated_params_loop is active on the event loop')
 
+        update_message = None
+
         try:
 
             self.logger.debug(
                 'Starting loop waiting for device params to change')
+
             while True:                                                     
                 self.logger.debug(
                     'send_updated_params_loop now awaiting event')
 
                 await self.params_updated_event.wait()
-
-                self.message_received_event.clear()
                 
                 await self.client.connected_event.wait()
-                self.logger.debug('Connected!')
+                self.logger.debug('Connected!')                
 
-                self.params = self.pending_params
-
-                update_message = self.client.get_update_payload(
-                    self.device_id,
-                    self.pending_params
-                )                  
+                if update_message is None:
+                    update_message = self.client.get_update_payload(
+                        self.device_id,
+                        self.params
+                    )
 
                 try:
+                    self.message_received_event.clear()
                     await self.client.send(update_message)                    
-                    await asyncio.wait_for(self.message_received_event.wait(), 5)
 
-                    self.pending_params = {}    
+                    await asyncio.wait_for(self.message_received_event.wait(), 2)
+ 
+                    update_message = None
                     self.params_updated_event.clear() 
                     self.logger.debug('Update message sent, event cleared, should '
                                 'loop now')
@@ -213,7 +214,6 @@ class SonoffDevice(object):
                     self.logger.error('Connection closed unexpectedly in send()')
                 except asyncio.TimeoutError:                     
                     self.logger.warn('Update message not received, close connection, then loop')
-                    self.params = self.old_params
                     await self.client.close_connection()                                        # closing connection causes cascade failure in setup_connection and reconnect
                 except OSError as ex:
                     self.logger.warn('OSError in send(): %s', format(ex) )
@@ -237,8 +237,7 @@ class SonoffDevice(object):
         self.logger.debug(
             'Scheduling params update message to device: %s' % params
         )    
-        self.old_params = self.params
-        self.pending_params = params
+        self.params = params
         self.params_updated_event.set()
 
     async def handle_message(self, message):
@@ -247,7 +246,8 @@ class SonoffDevice(object):
         state or storing basic device info
         """
         
-        self.shared_state = message
+        self.messages_received +=1
+
         response = json.loads(message)
 
         if (
@@ -258,7 +258,7 @@ class SonoffDevice(object):
                 self.message_received_event.set()             # only mark message as accepted if we are already online (otherwise this is an initial connection message)
  
             self.logger.debug(
-                'Received basic device info, storing in instance')
+                'Message: %i: Received basic device info, storing in instance', self.messages_received)
             self.basic_info = response
 
             if self.callback_after_update is not None:
@@ -267,9 +267,12 @@ class SonoffDevice(object):
         elif 'action' in response and response['action'] == "update":
  
             self.logger.debug(
-                'Received update from device, updating internal state to: %s'
-                % response['params'])
-            self.params = response['params']
+                'Message: %i: Received update from device, updating internal state to: %s'
+                , self.messages_received , response['params']  )
+            
+            if not self.params_updated_event.is_set():
+                self.params = response['params']
+                
             self.client.connected_event.set()
             self.client.disconnected_event.clear()
 
