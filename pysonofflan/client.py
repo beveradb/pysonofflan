@@ -81,7 +81,6 @@ class SonoffLANModeClient:
         self.ping_interval = ping_interval
         self.timeout = timeout
         self.logger = logger
-        self.keep_running = True
         self.websocket = None
         self.event_handler = event_handler
         self.connected_event = asyncio.Event()
@@ -131,7 +130,7 @@ class SonoffLANModeClient:
             
     async def receive_message_loop(self):
         try:
-            while self.keep_running:
+            while True:
                 self.logger.debug('Waiting for messages on websocket')
                 message = await self.websocket.recv()
                 await self.event_handler(message)

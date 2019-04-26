@@ -116,7 +116,7 @@ def find_host_from_device_id(device_id):
             if device.basic_info is not None:
                 device.shared_state['device_id_at_current_ip'] = \
                     device.device_id
-                device.keep_running = False
+                device.shutdown_event_loop()
 
         SonoffSwitch(
             host=ip,
@@ -224,13 +224,13 @@ def switch_device(host, inching, new_state):
 
                     if device.is_on:
                         if new_state == "on":
-                            device.client.keep_running = False
+                            device.shutdown_event_loop()
                         else:
                             await device.turn_off()
                             
                     elif device.is_off:
                         if new_state == "off":
-                            device.client.keep_running = False
+                            device.shutdown_event_loop()
                         else:
                             await device.turn_on()
 

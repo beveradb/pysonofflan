@@ -121,12 +121,13 @@ class SonoffDevice(object):
                 except websockets.InvalidMessage as ex:
                     self.logger.warn('Unable to connect: %s' % ex)
                 except websockets.exceptions.ConnectionClosed:
-                    self.logger.warn('Connection closed unexpectedly in setup_connection')
+                    self.logger.warn('Connection closed in receive_message_loop()')
                 except OSError as ex:
                     self.logger.warn('OSError in receive_message_loop(): %s', format(ex) )
                 
                 except asyncio.CancelledError:
                     self.logger.debug('receive_message_loop() cancelled' )
+                    break
 
                 except Exception as ex:
                     self.logger.error('Unexpected error in receive_message_loop(): %s', format(ex) )
@@ -147,7 +148,7 @@ class SonoffDevice(object):
 
         try:
 
-            wait_times = [0.5,1,2,5,10,30,60]
+            wait_times = [0.5,1,2,5,10,30,60]                                   # increasing backoff each retry attempt
 
             if retry_count >= len(wait_times):
                 retry_count = len(wait_times) -1
@@ -220,6 +221,7 @@ class SonoffDevice(object):
 
                 except asyncio.CancelledError:
                     self.logger.debug('send_updated_params_loop cancelled')
+                    break
 
                 except Exception as ex:
                     self.logger.error('Unexpected error in send(): %s', format(ex) )
@@ -246,7 +248,7 @@ class SonoffDevice(object):
         state or storing basic device info
         """
         
-        self.messages_received +=1
+        self.messages_received +=1                          # ensure debug messages are unique to stop deduplication by logger 
 
         response = json.loads(message)
 
@@ -255,14 +257,17 @@ class SonoffDevice(object):
             and 'deviceid' in response
         ):
             if self.client.connected_event.is_set():
-                self.message_received_event.set()             # only mark message as accepted if we are already online (otherwise this is an initial connection message)
+                self.message_received_event.set()           # only mark message as accepted if we are already online (otherwise this is an initial connection message)
  
             self.logger.debug(
                 'Message: %i: Received basic device info, storing in instance', self.messages_received)
             self.basic_info = response
 
-            if self.callback_after_update is not None:
-                await self.callback_after_update(self)
+            if self.client.connected_event.is_set():
+                self.message_received_event.set()           # only mark message as accepted if we are already online (otherwise this is an initial connection message)
+ 
+                if self.callback_after_update is not None:
+                    await self.callback_after_update(self)
 
         elif 'action' in response and response['action'] == "update":
  
@@ -272,12 +277,13 @@ class SonoffDevice(object):
             
             if not self.params_updated_event.is_set():
                 self.params = response['params']
-                
+
             self.client.connected_event.set()
             self.client.disconnected_event.clear()
 
             if self.callback_after_update is not None:
                 await self.callback_after_update(self)
+
         else:
             self.logger.error(
                 'Unknown message received from device: ' % message)
