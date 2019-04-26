@@ -178,8 +178,6 @@ class SonoffDevice(object):
         self.logger.debug(
             'send_updated_params_loop is active on the event loop')
 
-        update_message = None
-
         try:
 
             self.logger.debug(
@@ -194,11 +192,10 @@ class SonoffDevice(object):
                 await self.client.connected_event.wait()
                 self.logger.debug('Connected!')                
 
-                if update_message is None:
-                    update_message = self.client.get_update_payload(
-                        self.device_id,
-                        self.params
-                    )
+                update_message = self.client.get_update_payload(
+                    self.device_id,
+                    self.params
+                )
 
                 try:
                     self.message_received_event.clear()
@@ -206,7 +203,6 @@ class SonoffDevice(object):
 
                     await asyncio.wait_for(self.message_received_event.wait(), 2)
  
-                    update_message = None
                     self.params_updated_event.clear() 
                     self.logger.debug('Update message sent, event cleared, should '
                                 'loop now')
@@ -256,15 +252,12 @@ class SonoffDevice(object):
             ('error' in response and response['error'] == 0)
             and 'deviceid' in response
         ):
-            if self.client.connected_event.is_set():
-                self.message_received_event.set()           # only mark message as accepted if we are already online (otherwise this is an initial connection message)
- 
             self.logger.debug(
                 'Message: %i: Received basic device info, storing in instance', self.messages_received)
             self.basic_info = response
 
-            if self.client.connected_event.is_set():
-                self.message_received_event.set()           # only mark message as accepted if we are already online (otherwise this is an initial connection message)
+            if self.client.connected_event.is_set():        # only mark message as accepted if we are already online (otherwise this is an initial connection message)
+                self.message_received_event.set()           
  
                 if self.callback_after_update is not None:
                     await self.callback_after_update(self)
@@ -275,14 +268,16 @@ class SonoffDevice(object):
                 'Message: %i: Received update from device, updating internal state to: %s'
                 , self.messages_received , response['params']  )
             
-            if not self.params_updated_event.is_set():
-                self.params = response['params']
-
             self.client.connected_event.set()
             self.client.disconnected_event.clear()
 
-            if self.callback_after_update is not None:
-                await self.callback_after_update(self)
+            if not self.params_updated_event.is_set():      # only update internal state if there is not a new message queued to be sent
+                
+                if self.params != response['params']:       # only send client update message if there is a change
+                    self.params = response['params']
+
+                    if self.callback_after_update is not None:
+                        await self.callback_after_update(self)
 
         else:
             self.logger.error(
