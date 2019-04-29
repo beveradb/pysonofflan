@@ -63,7 +63,8 @@ class SonoffDevice(object):
                 logger=self.logger
             )
 
-            self.message_received_event = asyncio.Event()
+            self.message_ping_event = asyncio.Event()
+            self.message_acknowledged_event = asyncio.Event()
             self.params_updated_event = asyncio.Event()
 
             self.tasks.append(self.loop.create_task(self.send_updated_params_loop()))
@@ -133,6 +134,7 @@ class SonoffDevice(object):
                     self.logger.error('Unexpected error in receive_message_loop(): %s', format(ex) )
                 
                 finally:
+                    self.message_ping_event.set() 
                     self.logger.debug('finally: closing websocket from setup_connection')
                     await self.client.close_connection()
 
@@ -198,14 +200,23 @@ class SonoffDevice(object):
                 )
 
                 try:
-                    self.message_received_event.clear()
+                    self.message_ping_event.clear()
+                    self.message_acknowledged_event.clear()
                     await self.client.send(update_message)                    
 
-                    await asyncio.wait_for(self.message_received_event.wait(), 2)
+                    await asyncio.wait_for(self.message_ping_event.wait(), 2)
  
-                    self.params_updated_event.clear() 
-                    self.logger.debug('Update message sent, event cleared, should '
-                                'loop now')
+                    if self.message_acknowledged_event.is_set():
+                        self.params_updated_event.clear() 
+                        self.logger.debug('Update message sent, event cleared, should '
+                                    'loop now')
+                    else:
+                        self.logger.warn(
+                            "we didn't get an acknowledge message, we have probably been disconnected!")
+                                                                                # message 'ping', but not an acknowledgement, so loop
+                                                                                # if we were disconnected we will wait for reconnection
+                                                                                # if it was another type of message, we will resend change
+
 
                 except websockets.exceptions.ConnectionClosed:                                   
                     self.logger.error('Connection closed unexpectedly in send()')
@@ -245,6 +256,7 @@ class SonoffDevice(object):
         """
         
         self.messages_received +=1                          # ensure debug messages are unique to stop deduplication by logger 
+        self.message_ping_event.set() 
 
         response = json.loads(message)
 
@@ -257,7 +269,7 @@ class SonoffDevice(object):
             self.basic_info = response
 
             if self.client.connected_event.is_set():        # only mark message as accepted if we are already online (otherwise this is an initial connection message)
-                self.message_received_event.set()           
+                self.message_acknowledged_event.set()           
  
                 if self.callback_after_update is not None:
                     await self.callback_after_update(self)
@@ -267,17 +279,20 @@ class SonoffDevice(object):
             self.logger.debug(
                 'Message: %i: Received update from device, updating internal state to: %s'
                 , self.messages_received , response['params']  )
-            
-            self.client.connected_event.set()
-            self.client.disconnected_event.clear()
+
+            if not self.client.connected_event.is_set():
+                self.client.connected_event.set()
+                self.client.disconnected_event.clear()
+                send_update = True
 
             if not self.params_updated_event.is_set():      # only update internal state if there is not a new message queued to be sent
                 
                 if self.params != response['params']:       # only send client update message if there is a change
                     self.params = response['params']
+                    send_update = True
 
-                    if self.callback_after_update is not None:
-                        await self.callback_after_update(self)
+            if send_update and self.callback_after_update is not None:
+                await self.callback_after_update(self)
 
         else:
             self.logger.error(
