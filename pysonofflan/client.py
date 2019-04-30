@@ -125,8 +125,8 @@ class SonoffLANModeClientProtocol(websockets.WebSocketClientProtocol):
             self.ping_interval = V6_DEFAULT_PING_INTERVAL
             self.ping_timeout = V6_DEFAULT_TIMEOUT
 
-            self.close_code: int
-            self.close_reason: str
+            #self.close_code: int
+            #self.close_reason: str
 
             # Task sending keepalive pings.
             self.keepalive_ping_task = None
@@ -260,10 +260,10 @@ class SonoffLANModeClientProtocol(websockets.WebSocketClientProtocol):
             logger.debug("%s - event = connection_lost(%s)", self.side, exc)
             self.state = State.CLOSED
             logger.debug("%s - state = CLOSED", self.side)
-            #if not hasattr(self, "close_code"):
-            self.close_code = 1006
-            #if not hasattr(self, "close_reason"):
-            self.close_reason = ""
+            if self.close_code is None:
+                self.close_code = 1006
+            if self.close_reason is None:
+                self.close_reason = ""
             logger.debug(
                 "%s x code = %d, reason = %s",
                 self.side,
