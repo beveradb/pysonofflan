@@ -69,14 +69,17 @@ class SonoffSwitch(SonoffDevice):
                   SWITCH_STATE_UNKNOWN
         :rtype: str
         """
-        state = self.params['switch']
-
+        try:
+            state = self.params['switch']
+        except:
+            state = SonoffSwitch.SWITCH_STATE_UNKNOWN
+        
         if state == "off":
             return SonoffSwitch.SWITCH_STATE_OFF
         elif state == "on":
             return SonoffSwitch.SWITCH_STATE_ON
         else:
-            self.logger.warning("Unknown state %s returned.", state)
+            self.logger.debug("Unknown state %s returned.", state)
             return SonoffSwitch.SWITCH_STATE_UNKNOWN
 
     @state.setter
@@ -157,11 +160,12 @@ class SonoffSwitch(SonoffDevice):
                     "Inching switch activated, waiting %ss before "
                     "turning OFF again" % self.inching_seconds)
 
-                self.loop.call_later(
+                inching_task = self.loop.call_later(
                     self.inching_seconds,
                     self.callback_to_turn_off_inching
                 )
 
+                self.tasks.append(inching_task)        
                 await self.turn_on()
         else:
             self.logger.debug("Not inching switch, calling parent callback")

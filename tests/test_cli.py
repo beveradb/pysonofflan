@@ -50,6 +50,13 @@ class TestCLI(unittest.TestCase):
         result = runner.invoke(cli.cli, ['--device_id'])
         assert 'Error: --device_id option requires an argument' in \
                result.output
+               
+    def test_cli_no_host_id(self):
+        """Test the CLI."""
+        runner = CliRunner()
+        result = runner.invoke(cli.cli, ['--host'])
+        assert 'Error: --host option requires an argument' in \
+               result.output
 
     def test_cli_state(self):
         """Test the CLI."""
