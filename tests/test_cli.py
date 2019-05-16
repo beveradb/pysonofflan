@@ -64,14 +64,6 @@ class TestCLI(unittest.TestCase):
         result = runner.invoke(cli.cli, ['state'])
         assert 'No host name given, see usage below' in result.output
 
-    def test_cli_unconnectable_host_state(self):
-        """Test the CLI."""
-        runner = CliRunner()
-        result = runner.invoke(cli.cli, ['--host', '127.0.0.100', 'state'])
-        assert 'Initialising SonoffSwitch with host 127.0.0.100' in \
-               result.output
-        assert 'Unable to connect' in result.output
-
     def test_cli_discover(self):
         """Test the CLI."""
         runner = CliRunner()

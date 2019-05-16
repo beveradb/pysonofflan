@@ -1,6 +1,14 @@
 History
 =======
 
+0.3.0 (2019-05-16)
+------------------
+* Cleaned up shutdown code
+* Create retry logic throughout to deal with disconnect and other failures
+* Added functionality to deal with state maintenance
+* Updated dependencies
+* Removed flaky test
+
 0.2.1 (2019-02-02)
 ------------------
 * Made websocket library usage backwards-compatible with older versions
