@@ -50,7 +50,7 @@ to be handled by the user of the library.
 
 __author__ = """Andrew Beveridge"""
 __email__ = 'andrew@beveridge.uk'
-__version__ = '0.2.1'
+__version__ = '0.3.0'
 __url__ = 'https://github.com/beveradb/pysonofflan'
 
 # flake8: noqa
