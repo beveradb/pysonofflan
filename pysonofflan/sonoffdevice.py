@@ -82,7 +82,7 @@ class SonoffDevice(object):
 
     async def setup_connection(self, retry):
         self.logger.debug('setup_connection is active on the event loop')
-                                    
+        level = logging.WARN                                                                        # level to log with
         retry_count = 0
     
         while True:                                                                                   
@@ -93,26 +93,30 @@ class SonoffDevice(object):
                 self.logger.debug(
                     'setup_connection yielding to send_online_message()')
                 await self.client.send_online_message()
-
                 connected = True
 
             except websockets.InvalidMessage as ex:
                 self.logger.warn('Unable to connect: %s' % ex)   
                 await self.wait_before_retry(retry_count)               
             except ConnectionRefusedError:
-                self.logger.warn('Unable to connect: connection refused')                                                                     
+                self.logger.log( level, 'Unable to connect: connection refused')                                                                     
                 await self.wait_before_retry(retry_count)    
             except websockets.exceptions.ConnectionClosed:
-                self.logger.warn('Connection closed unexpectedly during setup')
+                self.logger.log( level, 'Connection closed unexpectedly during setup')
                 await self.wait_before_retry(retry_count)
             except OSError as ex:
-                self.logger.warn('OSError in setup_connection(): %s', format(ex) )
+                self.logger.log( level, 'OSError in setup_connection(): %s', format(ex) )
                 await self.wait_before_retry(retry_count)    
             except Exception as ex:
-                self.logger.error('Unexpected error in setup_connection(): %s', format(ex) )
+                self.logger.log( level, 'Unexpected error in setup_connection(): %s', format(ex) )
                 await self.wait_before_retry(retry_count)
 
+            finally:
+                level = logging.DEBUG                                                               # if we've had a error and logged it, don't log again
+
             if connected:
+                level = logging.WARN                                                                # if we've had a error and logged it, don't log again
+
                 retry_count = 0                                                                     # reset retry count after successful connection
                 try: 
                     self.logger.debug(
@@ -122,7 +126,7 @@ class SonoffDevice(object):
                 except websockets.InvalidMessage as ex:
                     self.logger.warn('Unable to connect: %s' % ex)
                 except websockets.exceptions.ConnectionClosed:
-                    self.logger.warn('Connection closed in receive_message_loop()')
+                    self.logger.debug('Connection closed in receive_message_loop()')
                 except OSError as ex:
                     self.logger.warn('OSError in receive_message_loop(): %s', format(ex) )
                 
