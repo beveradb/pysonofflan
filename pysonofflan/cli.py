@@ -162,7 +162,6 @@ def on(config: dict):
     """Turn the device on."""
     switch_device(config['host'], config['inching'], 'on')
 
-
 @cli.command()
 @pass_config
 def off(config: dict):

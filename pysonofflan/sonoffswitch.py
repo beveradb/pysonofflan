@@ -26,6 +26,7 @@ class SonoffSwitch(SonoffDevice):
     SWITCH_STATE_OFF = 'OFF'
     SWITCH_STATE_UNKNOWN = 'UNKNOWN'
 
+
     def __init__(self,
                  host: str,
                  callback_after_update: Callable[

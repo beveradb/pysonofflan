@@ -67,84 +67,18 @@ class SonoffDevice(object):
             self.message_acknowledged_event = asyncio.Event()
             self.params_updated_event = asyncio.Event()
 
-            self.tasks.append(self.loop.create_task(self.send_updated_params_loop()))
-                        
-            self.tasks.append(self.loop.create_task(self.send_availability_loop()))
-            
-            self.setup_connection_task = self.loop.create_task(self.setup_connection(not self.new_loop))
-            self.tasks.append(self.setup_connection_task)
+            self.tasks.append(self.loop.create_task(self.client.connect()))  
+
+            self.tasks.append(self.loop.create_task(self.client.receive_message_loop()))                       
+            self.tasks.append(self.loop.create_task(self.send_availability_loop()))    
+            self.send_updated_params_task = self.loop.create_task(self.send_updated_params_loop())
+            self.tasks.append(self.send_updated_params_task)
 
             if self.new_loop:
-                self.loop.run_until_complete(self.setup_connection_task)
+                self.loop.run_until_complete(self.send_updated_params_task)
 
         except asyncio.CancelledError:
             self.logger.debug('SonoffDevice loop ended, returning')
-
-    async def setup_connection(self, retry):
-        self.logger.debug('setup_connection is active on the event loop')
-                                    
-        retry_count = 0
-    
-        while True:                                                                                   
-            connected = False
-            try:
-                self.logger.debug('setup_connection yielding to connect()')
-                await self.client.connect()
-                self.logger.debug(
-                    'setup_connection yielding to send_online_message()')
-                await self.client.send_online_message()
-
-                connected = True
-
-            except websockets.InvalidMessage as ex:
-                self.logger.warn('Unable to connect: %s' % ex)   
-                await self.wait_before_retry(retry_count)               
-            except ConnectionRefusedError:
-                self.logger.warn('Unable to connect: connection refused')                                                                     
-                await self.wait_before_retry(retry_count)    
-            except websockets.exceptions.ConnectionClosed:
-                self.logger.warn('Connection closed unexpectedly during setup')
-                await self.wait_before_retry(retry_count)
-            except OSError as ex:
-                self.logger.warn('OSError in setup_connection(): %s', format(ex) )
-                await self.wait_before_retry(retry_count)    
-            except Exception as ex:
-                self.logger.error('Unexpected error in setup_connection(): %s', format(ex) )
-                await self.wait_before_retry(retry_count)
-
-            if connected:
-                retry_count = 0                                                                     # reset retry count after successful connection
-                try: 
-                    self.logger.debug(
-                        'setup_connection yielding to receive_message_loop()')
-                    await self.client.receive_message_loop()
-                                                                                    
-                except websockets.InvalidMessage as ex:
-                    self.logger.warn('Unable to connect: %s' % ex)
-                except websockets.exceptions.ConnectionClosed:
-                    self.logger.warn('Connection closed in receive_message_loop()')
-                except OSError as ex:
-                    self.logger.warn('OSError in receive_message_loop(): %s', format(ex) )
-                
-                except asyncio.CancelledError:
-                    self.logger.debug('receive_message_loop() cancelled' )
-                    break
-
-                except Exception as ex:
-                    self.logger.error('Unexpected error in receive_message_loop(): %s', format(ex) )
-                
-                finally:
-                    self.message_ping_event.set() 
-                    self.logger.debug('finally: closing websocket from setup_connection')
-                    await self.client.close_connection()
-
-            if not retry:
-                break    
-
-            retry_count +=1
-
-        self.shutdown_event_loop()
-        self.logger.debug('exiting setup_connection()')
 
     async def wait_before_retry(self, retry_count):
 
@@ -198,6 +132,8 @@ class SonoffDevice(object):
                     self.device_id,
                     self.params
                 )
+
+                self.logger.debug('Update message: %s', update_message)
 
                 try:
                     self.message_ping_event.clear()
@@ -254,41 +190,29 @@ class SonoffDevice(object):
         Receive message sent by the device and handle it, either updating
         state or storing basic device info
         """
-        
+        self.logger.debug('enter handle_mesage()')
+
         self.messages_received +=1                          # ensure debug messages are unique to stop deduplication by logger 
         self.message_ping_event.set() 
 
         response = json.loads(message)
 
-        if (
-            ('error' in response and response['error'] == 0)
-            and 'deviceid' in response
-        ):
+        if ('switch' in response):
             self.logger.debug(
-                'Message: %i: Received basic device info, storing in instance', self.messages_received)
+                'Message: %i: Received switch updates from device, storing in instance', self.messages_received)
             self.basic_info = response
+            self.basic_info['deviceid'] = self.host
 
-            if self.client.connected_event.is_set():        # only mark message as accepted if we are already online (otherwise this is an initial connection message)
-                self.message_acknowledged_event.set()           
- 
-                if self.callback_after_update is not None:
-                    await self.callback_after_update(self)
+            self.client.connected_event.set()
+            self.client.disconnected_event.clear()
 
-        elif 'action' in response and response['action'] == "update":
- 
-            self.logger.debug(
-                'Message: %i: Received update from device, updating internal state to: %s'
-                , self.messages_received , response['params']  )
-
-            if not self.client.connected_event.is_set():
-                self.client.connected_event.set()
-                self.client.disconnected_event.clear()
-                send_update = True
+            send_update = False
 
             if not self.params_updated_event.is_set():      # only update internal state if there is not a new message queued to be sent
                 
-                if self.params != response['params']:       # only send client update message if there is a change
-                    self.params = response['params']
+                if self.params == response['switch']:       # only send client update message if the change has been successful
+ 
+                    self.client.message_received_event.set()
                     send_update = True
 
             if send_update and self.callback_after_update is not None:
