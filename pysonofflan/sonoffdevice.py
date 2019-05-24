@@ -133,8 +133,6 @@ class SonoffDevice(object):
                     self.params
                 )
 
-                self.logger.debug('Update message: %s', update_message)
-
                 try:
                     self.message_ping_event.clear()
                     self.message_acknowledged_event.clear()
@@ -148,17 +146,10 @@ class SonoffDevice(object):
                                     'loop now')
                     else:
                         self.logger.warn(
-                            "we didn't get an acknowledge message, we have probably been disconnected!")
-                                                                                # message 'ping', but not an acknowledgement, so loop
-                                                                                # if we were disconnected we will wait for reconnection
-                                                                                # if it was another type of message, we will resend change
-
-
-                except websockets.exceptions.ConnectionClosed:                                   
-                    self.logger.error('Connection closed unexpectedly in send()')
+                            "we didn't get an acknowledge message, we have probably been disconnected!") # message 'ping', but not an acknowledgement, so loop
+  
                 except asyncio.TimeoutError:                     
-                    self.logger.warn('Update message not received, close connection, then loop')
-                    await self.client.close_connection()                                        # closing connection causes cascade failure in setup_connection and reconnect
+                    self.logger.warn('Update message not received, retry')
                 except OSError as ex:
                     self.logger.warn('OSError in send(): %s', format(ex) )
 
@@ -168,6 +159,8 @@ class SonoffDevice(object):
 
                 except Exception as ex:
                     self.logger.error('Unexpected error in send(): %s', format(ex) )
+
+                #break
 
         except asyncio.CancelledError:
             self.logger.debug('send_updated_params_loop cancelled')
@@ -182,6 +175,7 @@ class SonoffDevice(object):
         self.logger.debug(
             'Scheduling params update message to device: %s' % params
         )    
+
         self.params = params
         self.params_updated_event.set()
 
@@ -208,12 +202,21 @@ class SonoffDevice(object):
 
             send_update = False
 
-            if not self.params_updated_event.is_set():      # only update internal state if there is not a new message queued to be sent
+            if self.params_updated_event.is_set():          # is there is a new message queued to be sent
                 
-                if self.params == response['switch']:       # only send client update message if the change has been successful
+                if self.params['switch'] == response['switch']:       # only send client update message if the change has been successful
  
-                    self.client.message_received_event.set()
+                    self.message_acknowledged_event.set()
                     send_update = True
+
+                else:
+                    self.logger.debug('failed update!')
+
+            else:                                           # otherwise this is a status update message originating from the device
+                self.params = {"switch": response['switch']}
+                send_update = True
+
+                self.logger.debug('params: %s', self.params)
 
             if send_update and self.callback_after_update is not None:
                 await self.callback_after_update(self)

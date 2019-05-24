@@ -45,7 +45,7 @@ class SonoffLANModeClient:
         self.event_handler = event_handler
         self.connected_event = asyncio.Event()
         self.disconnected_event = asyncio.Event()
-        self.message_received_event = threading.Event()
+        # self.message_received_event = asyncio.Event()
         self.browser = None
         self.zeroconf = Zeroconf()
         self.loop = None
@@ -77,10 +77,6 @@ class SonoffLANModeClient:
         :param request: command to send to the device (can be dict or json)
         :return:
         """
-        #if isinstance(request, dict):
-        #    request = json.dumps(request)
-
-
 
         headers = { 'Content-Type': 'application/json;charset=UTF-8',
             'Accept': 'application/json',
@@ -93,19 +89,27 @@ class SonoffLANModeClient:
        
         response = requests.post(url, headers=headers, json=request)
 
-        self.logger.debug('http response received: %s', response.content)       
-        
+        self.logger.debug('response received: %s %s', response, response.content) 
+
+        response_json = json.loads(response.content)
+
+        if response_json['error'] != 0:
+            self.logger.warn('error received: %s', response.content)                  
+        else:
+            self.logger.info('message send to switch successfully') 
+
     def get_update_payload(self, device_id: str, params: dict) -> Dict:
 
         try:
             payload = {
-                'sequence': str(time.time()).replace('.','',1),
+                'sequence': str(int(time.time())),
                 'deviceid': device_id,
-                'selfApikey': 'cb0ff096-2a9d-4250-93ec-362fc1fe6f40',  # No apikey needed in LAN mode
-                'iv': '',
-                'encrypt': True,
+                #'selfApikey': 'cb0ff096-2a9d-4250-93ec-362fc1fe6f40',  # No apikey needed in LAN mode
+                'selfApikey': '123',  # No apikey needed in LAN mode
                 'data': json.dumps(params)
             }
+
+            self.logger.debug('plaintext: %s', payload)             
 
             self.format_encryption(payload)
 
@@ -133,9 +137,10 @@ class SonoffLANModeClient:
     def update_service(self, zeroconf, type, name):
 
 
-        self.logger.debug("Service %s updated" % name)
-
         info = zeroconf.get_service_info(type, name)
+
+        self.logger.debug("Service %s updated" % name)
+        self.logger.debug("properties: %s",info.properties)
 
         iv = info.properties.get(b'iv')
         data1 = info.properties.get(b'data1')
@@ -144,14 +149,11 @@ class SonoffLANModeClient:
 
         self.data = plaintext
 
-        self.logger.debug(plaintext)
+        self.logger.debug("data: %s", plaintext)
 
         asyncio.run_coroutine_threadsafe(self.event_handler(self.data), self.loop)
 
-        # self.message_received_event.set()
-
         self.logger.debug('exiting update_service')
-
 
     async def receive_message_loop(self):
 
