@@ -39,7 +39,6 @@ class SonoffDevice(object):
         self.loop = loop
         self.tasks = []                                                 # store the tasks that this module create s in a sequence
         self.new_loop = False                                           # use to decide if we should shutdown the loop on exit
-        self.messages_received = 0
 
         if logger is None:
             self.logger = logging.getLogger(__name__)
@@ -60,16 +59,16 @@ class SonoffDevice(object):
                 self.handle_message,
                 ping_interval=ping_interval,
                 timeout=timeout,
-                logger=self.logger
+                logger=self.logger,
+                loop=self.loop
             )
 
             self.message_ping_event = asyncio.Event()
             self.message_acknowledged_event = asyncio.Event()
             self.params_updated_event = asyncio.Event()
 
-            self.tasks.append(self.loop.create_task(self.client.connect()))  
-
-            self.tasks.append(self.loop.create_task(self.client.receive_message_loop()))                       
+            self.client.connect()
+             
             self.tasks.append(self.loop.create_task(self.send_availability_loop()))    
             self.send_updated_params_task = self.loop.create_task(self.send_updated_params_loop())
             self.tasks.append(self.send_updated_params_task)
@@ -149,7 +148,7 @@ class SonoffDevice(object):
                             "we didn't get an acknowledge message, we have probably been disconnected!") # message 'ping', but not an acknowledgement, so loop
   
                 except asyncio.TimeoutError:                     
-                    self.logger.warn('Update message not received, retry')
+                    self.logger.warn('Update message not received in timeout period, retry')
                 except OSError as ex:
                     self.logger.warn('OSError in send(): %s', format(ex) )
 
@@ -159,8 +158,6 @@ class SonoffDevice(object):
 
                 except Exception as ex:
                     self.logger.error('Unexpected error in send(): %s', format(ex) )
-
-                #break
 
         except asyncio.CancelledError:
             self.logger.debug('send_updated_params_loop cancelled')
@@ -186,14 +183,13 @@ class SonoffDevice(object):
         """
         self.logger.debug('enter handle_mesage()')
 
-        self.messages_received +=1                          # ensure debug messages are unique to stop deduplication by logger 
         self.message_ping_event.set() 
 
         response = json.loads(message)
 
         if ('switch' in response):
             self.logger.debug(
-                'Message: %i: Received switch updates from device, storing in instance', self.messages_received)
+                'Message: Received switch updates from device, storing in instance')
             self.basic_info = response
             self.basic_info['deviceid'] = self.host
 
