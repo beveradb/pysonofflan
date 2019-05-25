@@ -34,7 +34,7 @@ class SonoffDevice(object):
         self.context = context
         self.shared_state = shared_state
         self.basic_info = None
-        self.params = {}
+        self.params = { "switch": "unknown"}
         self.params_updated_event = None
         self.loop = loop
         self.tasks = []                                                 # store the tasks that this module create s in a sequence
@@ -213,8 +213,10 @@ class SonoffDevice(object):
                     self.logger.debug('failed update!')
 
             else:                                           # otherwise this is a status update message originating from the device
-                self.params = {"switch": response['switch']}
-                send_update = True
+
+                if self.params['switch'] != response['switch']:       # only send client update message if the status has changed
+                    self.params = {"switch": response['switch']}
+                    send_update = True
 
                 self.logger.debug('params: %s', self.params)
 

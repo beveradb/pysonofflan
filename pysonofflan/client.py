@@ -50,6 +50,8 @@ class SonoffLANModeClient:
         self.zeroconf = Zeroconf()
         self.loop = None
 
+        self.session = None
+
         if self.logger is None:
             self.logger = logging.getLogger(__name__)
 
@@ -69,58 +71,10 @@ class SonoffLANModeClient:
 
         self.browser = None
 
-    async def send(self, request: Union[str, Dict]):
-        """
-        Send message to an already-connected Sonoff LAN Mode Device
-        and return the response.
-
-        :param request: command to send to the device (can be dict or json)
-        :return:
-        """
-
-        headers = { 'Content-Type': 'application/json;charset=UTF-8',
-            'Accept': 'application/json',
-            'Accept-Language': 'en-gb'        
-        }           
-
-        url = 'http://192.168.0.227:8081/zeroconf/switch'
-
-        self.logger.debug('Sending http message: %s', request)
-       
-        response = requests.post(url, headers=headers, json=request)
-
-        self.logger.debug('response received: %s %s', response, response.content) 
-
-        response_json = json.loads(response.content)
-
-        if response_json['error'] != 0:
-            self.logger.warn('error received: %s', response.content)                  
-        else:
-            self.logger.info('message send to switch successfully') 
-
-    def get_update_payload(self, device_id: str, params: dict) -> Dict:
-
-        try:
-            payload = {
-                'sequence': str(int(time.time())),
-                'deviceid': device_id,
-                #'selfApikey': 'cb0ff096-2a9d-4250-93ec-362fc1fe6f40',  # No apikey needed in LAN mode
-                'selfApikey': '123',  # No apikey needed in LAN mode
-                'data': json.dumps(params)
-            }
-
-            self.logger.debug('plaintext: %s', payload)             
-
-            self.format_encryption(payload)
-
-        except Exception as ex:
-            self.logger.error('Unexpected error in send(): %s %s', format(ex), traceback.format_exc() )
-
-
-        return payload
+    
    
     def remove_service(self, zeroconf, type, name):
-        logger.debug("Service %s removed" % name)
+        self.logger.warn("Service %s removed" % name)
 
         # self.shutdown_event_loop()
 
@@ -132,7 +86,26 @@ class SonoffLANModeClient:
 
         if name == wanted_service_name:
             self.update_service(zeroconf, type, name)
+            
+            # listen for updates too
             self.browser = ServiceBrowser(self.zeroconf, name, listener=self)
+
+            # create an http session 
+            self.session = requests.Session()
+
+            # add the headers       
+            headers = { 'Content-Type': 'application/json;charset=UTF-8',
+                'Accept': 'application/json',
+                'Accept-Language': 'en-gb'        
+            }    
+            self.session.headers.update(headers)
+
+            # find and store the URL
+            info = zeroconf.get_service_info(type, name)
+            socket = self.parseAddress(info.address) + ":" + str(info.port)
+            self.logger.debug("service is at %s", socket)
+            self.url = 'http://' + socket + '/zeroconf/switch'
+            self.logger.debug("url for switch is %s", self.url)
 
     def update_service(self, zeroconf, type, name):
 
@@ -175,13 +148,54 @@ class SonoffLANModeClient:
         finally:
             self.logger.debug('receive_message_loop finally block reached: ')"""
 
+    async def send(self, request: Union[str, Dict]):
+        """
+        Send message to an already-connected Sonoff LAN Mode Device
+        and return the response.
+
+        :param request: command to send to the device (can be dict or json)
+        :return:
+        """
+
+        self.logger.debug('Sending http message: %s', request)      
+        response = self.session.post(self.url, json=request)
+        self.logger.debug('response received: %s %s', response, response.content) 
+
+        response_json = json.loads(response.content)
+
+        if response_json['error'] != 0:
+            self.logger.warn('error received: %s', response.content)                  
+        else:
+            self.logger.info('message sent to switch successfully') 
+
+    def get_update_payload(self, device_id: str, params: dict) -> Dict:
+
+        try:
+            payload = {
+                'sequence': str(int(time.time())), # ensure this field isn't too long, otherwise buffer overflow type issue caused in the device
+                'deviceid': device_id,
+                #'selfApikey': 'cb0ff096-2a9d-4250-93ec-362fc1fe6f40',  # No apikey needed in LAN mode
+                'selfApikey': '123',  # This field need to exist, but no idea what it is used for (https://github.com/itead/Sonoff_Devices_DIY_Tools/issues/5)
+                'data': json.dumps(params)
+            }
+
+            self.logger.debug('message to send (plaintext): %s', payload)             
+
+            self.format_encryption(payload)
+
+        except Exception as ex:
+            self.logger.error('Unexpected error in send(): %s %s', format(ex), traceback.format_exc() )
+
+
+        return payload
+
     def format_encryption(self, data):
 
         encrypt = True
         data["encrypt"] = encrypt
         if encrypt:
             iv = self.generate_iv()
-            data["iv"] = b64encode(iv) #.decode("utf-8") 
+            data["iv"] = b64encode(iv).decode("utf-8") 
             data["data"] = self.encrypt(data["data"], iv)
 
     def encrypt(self, data_element, iv):
@@ -199,7 +213,7 @@ class SonoffLANModeClient:
         encode = b64encode(ciphertext) 
 
         print(encode)
-        return encode #.decode("utf-8")
+        return encode.decode("utf-8")
 
     def generate_iv(self):
         return get_random_bytes(16)
@@ -220,3 +234,15 @@ class SonoffLANModeClient:
 
         return plaintext
 
+    def parseAddress(self, address):
+        """
+        Resolve the IP address of the device
+        :param address:
+        :return: add_str
+        """
+        add_list = []
+        for i in range(4):
+            add_list.append(int(address.hex()[(i * 2):(i + 1) * 2], 16))
+        add_str = str(add_list[0]) + "." + str(add_list[1]) + \
+            "." + str(add_list[2]) + "." + str(add_list[3])
+        return add_str
