@@ -33,6 +33,7 @@ class SonoffLANModeClient:
 
     DEFAULT_TIMEOUT = 5
     DEFAULT_PING_INTERVAL = 5
+    SERVICE_TYPE = "_ewelink._tcp.local."
 
     def __init__(self, host: str,
                  event_handler: Callable[[str], Awaitable[None]],
@@ -50,6 +51,7 @@ class SonoffLANModeClient:
         self.zeroconf = Zeroconf()
         self.loop = loop
         self.http_session = None
+        self.my_service_name = "eWeLink_" + self.host + "." + SonoffLANModeClient.SERVICE_TYPE
 
         if self.logger is None:
             self.logger = logging.getLogger(__name__)
@@ -59,34 +61,33 @@ class SonoffLANModeClient:
         Setup a mDNS listener
         """
 
+        self.logger.debug("Connect() entry")
+
         # listen for any added SOnOff
-        service_name = "_ewelink._tcp.local."
-        self.logger.debug('Listening for service to %s', service_name)
-        self.service_browser = ServiceBrowser(self.zeroconf, service_name, listener=self)
+        self.logger.debug('Listening for service to %s', SonoffLANModeClient.SERVICE_TYPE)
+        self.service_browser = ServiceBrowser(self.zeroconf, SonoffLANModeClient.SERVICE_TYPE, listener=self)
 
     async def close_connection(self):
 
-        self.logger.warn("Connectio closed called")
+        self.logger.debug("Connection closed called")
         self.service_browser = None
         self.disconnected_event.set()
-        self.cconnected_event.clear()
+        self.connected_event.clear()
 
     def remove_service(self, zeroconf, type, name):
 
         self.logger.warn("Service %s removed" % name)
         self.disconnected_event.set()
-        self.cconnected_event.clear()
+        self.connected_event.clear()
 
     def add_service(self, zeroconf, type, name):
 
-        wanted_service_name = "eWeLink_" + self.host + "._ewelink._tcp.local."
+        if name == self.my_service_name:
 
-        if name == wanted_service_name:
-
-            self.logger.debug("Service %s added" % name) 
+            self.logger.debug("Service type %s of name %s added", type, name) 
 
             # listen for updates to the specific device
-            self.browser = ServiceBrowser(self.zeroconf, name, listener=self)
+            self.service_browser = ServiceBrowser(zeroconf, name, listener=self)
 
             # create an http session so we can use http keep-alives
             self.http_session = requests.Session()
@@ -100,6 +101,7 @@ class SonoffLANModeClient:
 
             # find and store the URL to be used in send()
             info = zeroconf.get_service_info(type, name)
+            self.logger.warn("ServiceInfo: %s", info)
             socket = self.parseAddress(info.address) + ":" + str(info.port)
             self.logger.debug("service is at %s", socket)
             self.url = 'http://' + socket + '/zeroconf/switch'
@@ -110,8 +112,8 @@ class SonoffLANModeClient:
            
     def update_service(self, zeroconf, type, name):
 
-        info = zeroconf.get_service_info(type, name)
         self.logger.debug("Service %s updated" % name)
+        info = zeroconf.get_service_info(type, name)
         self.logger.debug("properties: %s",info.properties)
 
         # decrypt the message
@@ -145,7 +147,7 @@ class SonoffLANModeClient:
             self.logger.warn('error received: %s', response.content)
             # todo: think about how to process errors, or if retry in calling routine is sufficient
         else:
-            self.logger.info('message sent to switch successfully') 
+            self.logger.debug('message sent to switch successfully') 
             # no need to do anything here, the update is processed via the mDNS TXT record update
 
     def get_update_payload(self, device_id: str, params: dict) -> Dict:

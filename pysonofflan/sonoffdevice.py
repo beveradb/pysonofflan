@@ -45,6 +45,8 @@ class SonoffDevice(object):
         else:
             self.logger = logger
 
+        self.logger.debug('SonoffLANModeR3 entry')
+
         try:
             if self.loop is None:
 
@@ -79,7 +81,7 @@ class SonoffDevice(object):
         except asyncio.CancelledError:
             self.logger.debug('SonoffDevice loop ended, returning')
 
-    async def wait_before_retry(self, retry_count):
+    def wait_before_retry(self, retry_count):
 
         try:
 
@@ -91,8 +93,6 @@ class SonoffDevice(object):
             wait_time = wait_times[retry_count]
 
             self.logger.debug('Waiting %i seconds before retry', wait_time)
-
-            await asyncio.sleep(wait_time)
 
         except Exception as ex:
             self.logger.error('Unexpected error in wait_before_retry(): %s', format(ex) )
@@ -112,6 +112,8 @@ class SonoffDevice(object):
     async def send_updated_params_loop(self):
         self.logger.debug(
             'send_updated_params_loop is active on the event loop')
+
+        retry_count = 0
 
         try:
 
@@ -137,20 +139,27 @@ class SonoffDevice(object):
                     self.message_acknowledged_event.clear()
                     await self.client.send(update_message)                    
 
-                    await asyncio.wait_for(self.message_ping_event.wait(), 2)
- 
+                    self.client.update_service(self.client.zeroconf, SonoffLANModeClient.SERVICE_TYPE, self.client.my_service_name)
+
+                    await asyncio.wait_for(self.message_ping_event.wait(), self.wait_before_retry(retry_count))
+
                     if self.message_acknowledged_event.is_set():
                         self.params_updated_event.clear() 
                         self.logger.debug('Update message sent, event cleared, should '
                                     'loop now')
+                        retry_count = 0
                     else:
                         self.logger.warn(
-                            "we didn't get an acknowledge message, we have probably been disconnected!") # message 'ping', but not an acknowledgement, so loop
-  
+                            "we didn't get a confirmed acknowledgement, state has changed in between retry!")
+                        retry_count += 1
+
                 except asyncio.TimeoutError:                     
                     self.logger.warn('Update message not received in timeout period, retry')
+                    retry_count += 1
+
                 except OSError as ex:
                     self.logger.warn('OSError in send(): %s', format(ex) )
+                    retry_count += 1
 
                 except asyncio.CancelledError:
                     self.logger.debug('send_updated_params_loop cancelled')
@@ -158,6 +167,9 @@ class SonoffDevice(object):
 
                 except Exception as ex:
                     self.logger.error('Unexpected error in send(): %s', format(ex) )
+                    break
+
+
 
         except asyncio.CancelledError:
             self.logger.debug('send_updated_params_loop cancelled')
@@ -204,17 +216,22 @@ class SonoffDevice(object):
  
                     self.message_acknowledged_event.set()
                     send_update = True
+                    self.logger.debug('expected update received from switch: %s', response['switch'])
 
-                else:
-                    self.logger.debug('failed update!')
+                else:                   
+                    self.logger.warn('failed update! state is: %s, expecting: %s', response['switch'], self.params['switch'])
 
             else:                                           # otherwise this is a status update message originating from the device
 
                 if self.params['switch'] != response['switch']:       # only send client update message if the status has changed
                     self.params = {"switch": response['switch']}
                     send_update = True
+                    self.logger.info('unsolicated updated received from switch: %s', response['switch'])
 
-                self.logger.debug('params: %s', self.params)
+                else:
+                    self.logger.warn('received unexpected update from switch: %s', response['switch'])
+
+
 
             if send_update and self.callback_after_update is not None:
                 await self.callback_after_update(self)
