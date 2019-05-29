@@ -40,9 +40,11 @@ class SonoffLANModeClient:
                  ping_interval: int = DEFAULT_PING_INTERVAL,
                  timeout: int = DEFAULT_TIMEOUT,
                  logger: logging.Logger = None,
-                 loop = None):
+                 loop = None,
+                 api_key: str = None):
 
         self.host = host
+        self.api_key = api_key
         self.logger = logger
         self.event_handler = event_handler
         self.connected_event = asyncio.Event()
@@ -53,6 +55,7 @@ class SonoffLANModeClient:
         self.http_session = None
         self.my_service_name = "eWeLink_" + self.host + "." + SonoffLANModeClient.SERVICE_TYPE
 
+
         if self.logger is None:
             self.logger = logging.getLogger(__name__)
 
@@ -60,8 +63,6 @@ class SonoffLANModeClient:
         """
         Setup a mDNS listener
         """
-
-        self.logger.debug("Connect() entry")
 
         # listen for any added SOnOff
         self.logger.debug('Listening for service to %s', SonoffLANModeClient.SERVICE_TYPE)
@@ -78,7 +79,7 @@ class SonoffLANModeClient:
 
         self.logger.warn("Service %s removed" % name)
         self.disconnected_event.set()
-        self.connected_event.clear()
+        self.cconnected_event.clear()
 
     def add_service(self, zeroconf, type, name):
 
@@ -132,7 +133,6 @@ class SonoffLANModeClient:
         """
         Send message to an already-connected Sonoff LAN Mode Device
         and return the response.
-
         :param request: command to send to the device (can be dict or json)
         :return:
         """
@@ -149,7 +149,7 @@ class SonoffLANModeClient:
         else:
             self.logger.debug('message sent to switch successfully') 
             # no need to do anything here, the update is processed via the mDNS TXT record update
-
+            
     def get_update_payload(self, device_id: str, params: dict) -> Dict:
 
         payload = {
@@ -175,7 +175,7 @@ class SonoffLANModeClient:
 
     def encrypt(self, data_element, iv):
 
-        ApiKey = b'3c1433d8-a02c-479a-a126-ac9438e6bfe5' # [INSERT_TEST_API_KEY_HERE]
+        ApiKey = bytes(self.api_key, 'utf-8') # b'3c1433d8-a02c-479a-a126-ac9438e6bfe5' # [INSERT_TEST_API_KEY_HERE]
         plaintext = bytes(data_element, 'utf-8')
 
         h = MD5.new()
@@ -194,7 +194,9 @@ class SonoffLANModeClient:
 
     def decrypt(self, data_element, iv):
 
-        ApiKey = b'3c1433d8-a02c-479a-a126-ac9438e6bfe5' # [INSERT_TEST_API_KEY_HERE]
+        self.logger.debug('decrypt() entry: %s', self.api_key)
+
+        ApiKey = bytes(self.api_key, 'utf-8') # b'3c1433d8-a02c-479a-a126-ac9438e6bfe5' # [INSERT_TEST_API_KEY_HERE]
         encoded =  data_element
 
         h = MD5.new()

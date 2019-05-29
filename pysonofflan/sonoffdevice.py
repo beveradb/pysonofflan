@@ -22,7 +22,9 @@ class SonoffDevice(object):
                  loop=None,
                  ping_interval=SonoffLANModeClient.DEFAULT_PING_INTERVAL,
                  timeout=SonoffLANModeClient.DEFAULT_TIMEOUT,
-                 context: str = None) -> None:
+                 context: str = None,
+                 device_id: str = None,
+                 api_key: str = None) -> None:
         """
         Create a new SonoffDevice instance.
 
@@ -32,6 +34,9 @@ class SonoffDevice(object):
         self.callback_after_update = callback_after_update
         self.host = host
         self.context = context
+        # todo: fix overload with device_id property 
+        # self.device_id = device_id
+        self.api_key = api_key
         self.shared_state = shared_state
         self.basic_info = None
         self.params = { "switch": "unknown"}
@@ -45,8 +50,6 @@ class SonoffDevice(object):
         else:
             self.logger = logger
 
-        self.logger.debug('SonoffLANModeR3 entry')
-
         try:
             if self.loop is None:
 
@@ -57,12 +60,13 @@ class SonoffDevice(object):
             self.logger.debug(
                 'Initializing SonoffLANModeClient class in SonoffDevice')
             self.client = SonoffLANModeClient(
-                host,
+                device_id,
                 self.handle_message,
                 ping_interval=ping_interval,
                 timeout=timeout,
                 logger=self.logger,
-                loop=self.loop
+                loop=self.loop,
+                api_key=api_key
             )
 
             self.message_ping_event = asyncio.Event()
@@ -81,7 +85,7 @@ class SonoffDevice(object):
         except asyncio.CancelledError:
             self.logger.debug('SonoffDevice loop ended, returning')
 
-    def wait_before_retry(self, retry_count):
+    def calculate_retry(self, retry_count):
 
         try:
 
@@ -92,11 +96,11 @@ class SonoffDevice(object):
 
             wait_time = wait_times[retry_count]
 
-            self.logger.debug('Waiting %i seconds before retry', wait_time)
+            return wait_time
 
         except Exception as ex:
-            self.logger.error('Unexpected error in wait_before_retry(): %s', format(ex) )
-                
+            self.logger.error('Unexpected error in wait_before_retry(): %s', format(ex) )        
+
     async def send_availability_loop(self):
 
         try:
@@ -109,6 +113,7 @@ class SonoffDevice(object):
         finally:
             self.logger.debug('exiting send_availability_loop()')
 
+    
     async def send_updated_params_loop(self):
         self.logger.debug(
             'send_updated_params_loop is active on the event loop')
@@ -141,7 +146,7 @@ class SonoffDevice(object):
 
                     self.client.update_service(self.client.zeroconf, SonoffLANModeClient.SERVICE_TYPE, self.client.my_service_name)
 
-                    await asyncio.wait_for(self.message_ping_event.wait(), self.wait_before_retry(retry_count))
+                    await asyncio.wait_for(self.message_ping_event.wait(), self.calculate_retry(retry_count))
 
                     if self.message_acknowledged_event.is_set():
                         self.params_updated_event.clear() 
@@ -159,6 +164,7 @@ class SonoffDevice(object):
 
                 except OSError as ex:
                     self.logger.warn('OSError in send(): %s', format(ex) )
+                    await asyncio.sleep(self.calculate_retry(retry_count))
                     retry_count += 1
 
                 except asyncio.CancelledError:
@@ -193,6 +199,7 @@ class SonoffDevice(object):
         Receive message sent by the device and handle it, either updating
         state or storing basic device info
         """
+
         self.logger.debug('enter handle_mesage()')
 
         self.message_ping_event.set() 
@@ -240,7 +247,6 @@ class SonoffDevice(object):
             self.logger.error(
                 'Unknown message received from device: ' % message)
             raise Exception('Unknown message received from device')
-
     def shutdown_event_loop(self):
         self.logger.debug('shutdown_event_loop called')
 
@@ -341,7 +347,7 @@ class SonoffDevice(object):
     def __repr__(self):
         return "<%s at %s>" % (
             self.__class__.__name__,
-            self.host)
+            self.device_id)
 
     @property
     def available(self) -> bool:
