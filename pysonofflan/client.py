@@ -79,7 +79,7 @@ class SonoffLANModeClient:
 
         self.logger.warn("Service %s removed" % name)
         self.disconnected_event.set()
-        self.cconnected_event.clear()
+        self.connected_event.clear()
 
     def add_service(self, zeroconf, type, name):
 
@@ -102,11 +102,20 @@ class SonoffLANModeClient:
 
             # find and store the URL to be used in send()
             info = zeroconf.get_service_info(type, name)
-            self.logger.warn("ServiceInfo: %s", info)
+            self.logger.info("ServiceInfo: %s", info)
             socket = self.parseAddress(info.address) + ":" + str(info.port)
             self.logger.debug("service is at %s", socket)
             self.url = 'http://' + socket + '/zeroconf/switch'
             self.logger.debug("url for switch is %s", self.url)
+
+            # setup retries (https://urllib3.readthedocs.io/en/latest/reference/urllib3.util.html#urllib3.util.retry.Retry)
+            from requests.adapters import HTTPAdapter
+            from urllib3.util.retry import Retry
+
+            # retries for approx 10 retries (5 mins) (time for timeout of service)
+            # todo: no retries at moment, lets see what failure we get
+            retries = Retry(total=0, backoff_factor=0.5, method_whitelist=['POST'], status_forcelist=None)
+            self.http_session.mount('http://', HTTPAdapter(max_retries=retries))
 
             # process the initial message
             self.update_service(zeroconf, type, name)

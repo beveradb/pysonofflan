@@ -40,7 +40,6 @@ class SonoffDevice(object):
         self.shared_state = shared_state
         self.basic_info = None
         self.params = { "switch": "unknown"}
-        self.params_updated_event = None
         self.loop = loop
         self.tasks = []                                                 # store the tasks that this module create s in a sequence
         self.new_loop = False                                           # use to decide if we should shutdown the loop on exit
@@ -157,7 +156,7 @@ class SonoffDevice(object):
                         self.logger.warn(
                             "we didn't get a confirmed acknowledgement, state has changed in between retry!")
                         retry_count += 1
-
+                    
                 except asyncio.TimeoutError:                     
                     self.logger.warn('Update message not received in timeout period, retry')
                     retry_count += 1
@@ -222,6 +221,7 @@ class SonoffDevice(object):
                 if self.params['switch'] == response['switch']:       # only send client update message if the change has been successful
  
                     self.message_acknowledged_event.set()
+                    #self.params_updated_event.clear() 
                     send_update = True
                     self.logger.debug('expected update received from switch: %s', response['switch'])
 
