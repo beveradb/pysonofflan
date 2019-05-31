@@ -23,8 +23,8 @@ class SonoffDevice(object):
                  ping_interval=SonoffLANModeClient.DEFAULT_PING_INTERVAL,
                  timeout=SonoffLANModeClient.DEFAULT_TIMEOUT,
                  context: str = None,
-                 device_id: str = None,
-                 api_key: str = None) -> None:
+                 device_id: str = "",
+                 api_key: str = "") -> None:
         """
         Create a new SonoffDevice instance.
 
@@ -59,12 +59,13 @@ class SonoffDevice(object):
             self.logger.debug(
                 'Initializing SonoffLANModeClient class in SonoffDevice')
             self.client = SonoffLANModeClient(
-                device_id,
+                host,
                 self.handle_message,
                 ping_interval=ping_interval,
                 timeout=timeout,
                 logger=self.logger,
                 loop=self.loop,
+                device_id=device_id,
                 api_key=api_key
             )
 

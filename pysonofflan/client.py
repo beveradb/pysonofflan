@@ -18,6 +18,7 @@ from Crypto.Util.Padding import unpad, pad
 from base64 import b64decode, b64encode
 from Crypto.Random import get_random_bytes
 
+import socket
 
 class SonoffLANModeClient:
     """
@@ -41,9 +42,11 @@ class SonoffLANModeClient:
                  timeout: int = DEFAULT_TIMEOUT,
                  logger: logging.Logger = None,
                  loop = None,
-                 api_key: str = None):
+                 device_id: str = "",
+                 api_key: str = ""):
 
         self.host = host
+        self.device_id = device_id
         self.api_key = api_key
         self.logger = logger
         self.event_handler = event_handler
@@ -53,8 +56,7 @@ class SonoffLANModeClient:
         self.zeroconf = Zeroconf()
         self.loop = loop
         self.http_session = None
-        self.my_service_name = "eWeLink_" + self.host + "." + SonoffLANModeClient.SERVICE_TYPE
-
+        self.my_service_name = None
 
         if self.logger is None:
             self.logger = logging.getLogger(__name__)
@@ -83,43 +85,60 @@ class SonoffLANModeClient:
 
     def add_service(self, zeroconf, type, name):
 
-        if name == self.my_service_name:
+        if self.my_service_name is None:
 
-            self.logger.debug("Service type %s of name %s added", type, name) 
-
-            # listen for updates to the specific device
-            self.service_browser = ServiceBrowser(zeroconf, name, listener=self)
-
-            # create an http session so we can use http keep-alives
-            self.http_session = requests.Session()
-
-            # add the http headers
-            headers = { 'Content-Type': 'application/json;charset=UTF-8',
-                'Accept': 'application/json',
-                'Accept-Language': 'en-gb'        
-            }    
-            self.http_session.headers.update(headers)
-
-            # find and store the URL to be used in send()
             info = zeroconf.get_service_info(type, name)
             self.logger.info("ServiceInfo: %s", info)
-            socket = self.parseAddress(info.address) + ":" + str(info.port)
-            self.logger.debug("service is at %s", socket)
-            self.url = 'http://' + socket + '/zeroconf/switch'
-            self.logger.debug("url for switch is %s", self.url)
+            found_ip = self.parseAddress(info.address)
 
-            # setup retries (https://urllib3.readthedocs.io/en/latest/reference/urllib3.util.html#urllib3.util.retry.Retry)
-            from requests.adapters import HTTPAdapter
-            from urllib3.util.retry import Retry
+            if self.device_id != "":
 
-            # retries for approx 10 retries (5 mins) (time for timeout of service)
-            # todo: no retries at moment, lets see what failure we get
-            retries = Retry(total=0, backoff_factor=0.5, method_whitelist=['POST'], status_forcelist=None)
-            self.http_session.mount('http://', HTTPAdapter(max_retries=retries))
+                if name == "eWeLink_" + self.device_id + "." + SonoffLANModeClient.SERVICE_TYPE:
+                    self.my_service_name = name
 
-            # process the initial message
-            self.update_service(zeroconf, type, name)
-           
+            elif self.host != "":
+
+                if socket.gethostbyname(self.host) == found_ip:
+                    self.my_service_name = name
+
+
+            if self.my_service_name is not None:
+
+                self.logger.debug("Service type %s of name %s added", type, name) 
+
+                # listen for updates to the specific device
+                self.service_browser = ServiceBrowser(zeroconf, name, listener=self)
+
+                # create an http session so we can use http keep-alives
+                self.http_session = requests.Session()
+
+                # add the http headers
+                headers = { 'Content-Type': 'application/json;charset=UTF-8',
+                    'Accept': 'application/json',
+                    'Accept-Language': 'en-gb'        
+                }    
+                self.http_session.headers.update(headers)
+
+                # find socket for end-point
+                socket_text = found_ip + ":" + str(info.port)          
+                self.logger.debug("service is at %s", socket_text)
+                self.url = 'http://' + socket_text + '/zeroconf/switch'
+                self.logger.debug("url for switch is %s", self.url)
+
+                # setup retries (https://urllib3.readthedocs.io/en/latest/reference/urllib3.util.html#urllib3.util.retry.Retry)
+                from requests.adapters import HTTPAdapter
+                from urllib3.util.retry import Retry
+
+                # retries for approx 10 retries (5 mins) (time for timeout of service)
+                # todo: no retries at moment, lets see what failure we get
+                retries = Retry(total=0, backoff_factor=0.5, method_whitelist=['POST'], status_forcelist=None)
+                self.http_session.mount('http://', HTTPAdapter(max_retries=retries))
+
+                # process the initial message
+                self.update_service(zeroconf, type, name)
+
+
+
     def update_service(self, zeroconf, type, name):
 
         self.logger.debug("Service %s updated" % name)
