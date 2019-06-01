@@ -79,9 +79,13 @@ class SonoffLANModeClient:
 
     def remove_service(self, zeroconf, type, name):
 
-        self.logger.warn("Service %s removed" % name)
-        self.disconnected_event.set()
-        self.connected_event.clear()
+        if self.my_service_name == name:
+            self.logger.warn("Service %s removed" % name)
+            self.disconnected_event.set()
+            self.connected_event.clear()
+
+        else:
+            self.logger.debug("%s: Service %s removed", self.my_service_name, name)
 
     def add_service(self, zeroconf, type, name):
 
@@ -104,7 +108,7 @@ class SonoffLANModeClient:
 
             if self.my_service_name is not None:
 
-                self.logger.debug("Service type %s of name %s added", type, name) 
+                self.logger.info("Service type %s of name %s added", type, name) 
 
                 # listen for updates to the specific device
                 self.service_browser = ServiceBrowser(zeroconf, name, listener=self)
@@ -137,25 +141,38 @@ class SonoffLANModeClient:
                 # process the initial message
                 self.update_service(zeroconf, type, name)
 
+            else:
+
+                self.logger.debug("%s: Service type %s of name %s added", self.my_service_name, type, name) 
+
+        else:
+
+            self.logger.debug("%s: Service type %s of name %s added", self.my_service_name, type, name) 
 
 
     def update_service(self, zeroconf, type, name):
 
-        self.logger.debug("Service %s updated" % name)
-        info = zeroconf.get_service_info(type, name)
-        self.logger.debug("properties: %s",info.properties)
+        if self.my_service_name == name:
 
-        # decrypt the message
-        iv = info.properties.get(b'iv')
-        data1 = info.properties.get(b'data1')
-        plaintext = self.decrypt(data1,iv)
-        self.data = plaintext
-        self.logger.debug("data: %s", plaintext)
+            self.logger.debug("Service %s updated" % name)
+            info = zeroconf.get_service_info(type, name)
+            self.logger.debug("properties: %s",info.properties)
 
-        # process the events on an event loop (this method is on a background thread called from zeroconf)
-        asyncio.run_coroutine_threadsafe(self.event_handler(self.data), self.loop)
+            if info.properties.get(b'encrypt'):
+                # decrypt the message
+                iv = info.properties.get(b'iv')
+                data1 = info.properties.get(b'data1')
+                plaintext = self.decrypt(data1,iv)
+                self.data = plaintext
+                self.logger.debug("decrypted data: %s", plaintext)
 
-        self.logger.debug('exiting update_service')
+            else:
+                self.data = info.properties.get(b'data1')
+
+            # process the events on an event loop (this method is on a background thread called from zeroconf)
+            asyncio.run_coroutine_threadsafe(self.event_handler(self.data), self.loop)
+
+            self.logger.debug('exiting update_service')
 
     async def send(self, request: Union[str, Dict]):
         """
@@ -188,8 +205,12 @@ class SonoffLANModeClient:
             'data': json.dumps(params)
         }
 
-        self.logger.debug('message to send (plaintext): %s', payload)             
-        self.format_encryption(payload)
+        self.logger.debug('message to send (plaintext): %s', payload)
+
+        if self.api_key != "":
+            self.format_encryption(payload)
+            self.logger.debug('encrypted: %s', payload)
+
         return payload
 
     def format_encryption(self, data):
