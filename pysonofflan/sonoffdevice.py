@@ -103,13 +103,31 @@ class SonoffDevice(object):
 
     async def send_availability_loop(self):
 
+        self.logger.debug('enter send_availability_loop()')  
+
         try:
             while True:
-                await self.client.disconnected_event.wait()
+
+                self.logger.debug('waiting for connection')
+
+                await self.client.connected_event.wait()
+                self.client.disconnected_event.clear()
+
+                self.logger.debug('connected event, sending update')
 
                 if self.callback_after_update is not None:
                     await self.callback_after_update(self)
-                    self.client.disconnected_event.clear()
+
+                self.logger.debug('waiting for disconnection')
+
+                await self.client.disconnected_event.wait()
+                self.client.connected_event.clear()
+
+                self.logger.debug('disconnected event, sending update')
+
+                if self.callback_after_update is not None:
+                    await self.callback_after_update(self)
+
         finally:
             self.logger.debug('exiting send_availability_loop()')
 
@@ -213,7 +231,6 @@ class SonoffDevice(object):
             self.basic_info['deviceid'] = self.host
 
             self.client.connected_event.set()
-            self.client.disconnected_event.clear()
 
             send_update = False
 

@@ -10,7 +10,7 @@ import enum
 import traceback
 
 import requests
-from zeroconf import  ServiceBrowser, Zeroconf
+import zeroconf23.zeroconf
 
 from Crypto.Hash import MD5
 from Crypto.Cipher import AES
@@ -53,7 +53,7 @@ class SonoffLANModeClient:
         self.connected_event = asyncio.Event()
         self.disconnected_event = asyncio.Event()
         self.service_browser = None
-        self.zeroconf = Zeroconf()
+        self.zeroconf = zeroconf23.zeroconf.Zeroconf()
         self.loop = loop
         self.http_session = None
         self.my_service_name = None
@@ -68,21 +68,21 @@ class SonoffLANModeClient:
 
         # listen for any added SOnOff
         self.logger.debug('Listening for service to %s', SonoffLANModeClient.SERVICE_TYPE)
-        self.service_browser = ServiceBrowser(self.zeroconf, SonoffLANModeClient.SERVICE_TYPE, listener=self)
+        self.service_browser = zeroconf23.zeroconf.ServiceBrowser(self.zeroconf, SonoffLANModeClient.SERVICE_TYPE, listener=self)
 
-    async def close_connection(self):
+    def close_connection(self):
 
-        self.logger.debug("Connection closed called")
+        self.logger.debug("enter close_connection()")
         self.service_browser = None
         self.disconnected_event.set()
-        self.connected_event.clear()
+        self.my_service_name = None
 
     def remove_service(self, zeroconf, type, name):
 
         if self.my_service_name == name:
             self.logger.warn("Service %s removed" % name)
-            self.disconnected_event.set()
-            self.connected_event.clear()
+
+            self.close_connection()
 
         else:
             self.logger.debug("%s: Service %s removed", self.my_service_name, name)
@@ -111,7 +111,7 @@ class SonoffLANModeClient:
                 self.logger.info("Service type %s of name %s added", type, name) 
 
                 # listen for updates to the specific device
-                self.service_browser = ServiceBrowser(zeroconf, name, listener=self)
+                self.service_browser = zeroconf23.zeroconf.ServiceBrowser(zeroconf, name, listener=self)
 
                 # create an http session so we can use http keep-alives
                 self.http_session = requests.Session()
