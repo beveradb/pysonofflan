@@ -10,7 +10,7 @@ import enum
 import traceback
 
 import requests
-import zeroconf23.zeroconf
+import zeroconf.zeroconf
 
 from Crypto.Hash import MD5
 from Crypto.Cipher import AES
