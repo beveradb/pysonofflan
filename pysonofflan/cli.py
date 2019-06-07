@@ -55,34 +55,25 @@ pass_config = click.make_pass_decorator(dict, ensure=True)
               help='IP address or hostname of the device to connect to.')
 @click.option('--device_id', envvar="PYSONOFFLAN_device_id", required=False,
               help='Device ID of the device to connect to.')
+@click.option('--api_key', envvar="PYSONOFFLAN_api_key", required=False,
+              help='api key for the device to connect to.')              
 @click.option('--inching', envvar="PYSONOFFLAN_inching", required=False,
               help='Number of seconds of "on" time if this is an '
                    'Inching/Momentary switch.')
 @click.pass_context
 @click_log.simple_verbosity_option(logger, '--loglevel', '-l')
 @click.version_option()
-def cli(ctx, host, device_id, inching):
+def cli(ctx, host, device_id, api_key, inching):
     """A cli tool for controlling Sonoff Smart Switches/Plugs in LAN Mode."""
     if ctx.invoked_subcommand == "discover":
         return
 
-    if device_id is not None and host is None:
-        logger.info(
-            "Device ID is given, using discovery to find host %s" % device_id)
-        host = find_host_from_device_id(device_id=device_id)
-        if host:
-            logger.info("Matching Device ID found! IP: %s" % host)
-        else:
-            logger.info("No device with name %s found" % device_id)
-            return
-
-    if host is None:
-        logger.error("No host name given, see usage below:")
+    if host is None and device_id is None:
+        logger.error("No host name or device_id given, see usage below:")
         click.echo(ctx.get_help())
         sys.exit(1)
 
-    ctx.obj = {"host": host, "inching": inching}
-
+    ctx.obj = {"host": host, "device_id": device_id, "api_key": api_key, "inching": inching}
 
 @cli.command()
 def discover():
@@ -97,44 +88,6 @@ def discover():
         logger.info("Found Sonoff LAN Mode device at IP %s" % ip)
 
     return found_devices
-
-
-def find_host_from_device_id(device_id):
-    """Discover a device identified by its device_id"""
-    logger.info(
-        "Trying to discover %s by scanning for devices "
-        "on local network, please wait..." % device_id)
-    found_devices = asyncio.get_event_loop().run_until_complete(
-        Discover.discover(logger)).items()
-    for ip, _ in found_devices:
-        logger.info("Found Sonoff LAN Mode device at IP %s, attempting to "
-                    "read state to get device ID" % ip)
-
-        shared_state = {'device_id_at_current_ip': None}
-
-        async def device_id_callback(device: SonoffSwitch):
-            if device.basic_info is not None:
-                device.shared_state['device_id_at_current_ip'] = \
-                    device.device_id
-                device.shutdown_event_loop()
-
-        SonoffSwitch(
-            host=ip,
-            callback_after_update=device_id_callback,
-            shared_state=shared_state,
-            logger=logger
-        )
-
-        current_device_id = shared_state['device_id_at_current_ip']
-
-        if device_id.lower() == current_device_id.lower():
-            return ip
-        else:
-            logger.info(
-                "Found device ID %s which did not match" % current_device_id
-            )
-    return None
-
 
 @cli.command()
 @pass_config
@@ -152,7 +105,9 @@ def state(config: dict):
     SonoffSwitch(
         host=config['host'],
         callback_after_update=state_callback,
-        logger=logger
+        logger=logger,
+        device_id=config['device_id'],
+        api_key=config['api_key']
     )
 
 
@@ -191,7 +146,9 @@ def listen(config: dict):
         host=config['host'],
         callback_after_update=state_callback,
         shared_state=shared_state,
-        logger=logger
+        logger=logger,
+        device_id=config['device_id'],
+        api_key=config['api_key']
     )
 
 
@@ -241,7 +198,9 @@ def switch_device(host, inching, new_state):
         host=host,
         callback_after_update=update_callback,
         inching_seconds=int(inching) if inching else None,
-        logger=logger
+        logger=logger,
+        device_id=config['device_id'],
+        api_key=config['api_key']
     )
 
 
