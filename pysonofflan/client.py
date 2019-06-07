@@ -67,7 +67,6 @@ class SonoffLANModeClient:
         """
 
         # listen for any added SOnOff
-        self.logger.debug('Listening for service to %s', SonoffLANModeClient.SERVICE_TYPE)
         self.service_browser = zeroconf23.zeroconf.ServiceBrowser(self.zeroconf, SonoffLANModeClient.SERVICE_TYPE, listener=self)
 
     def close_connection(self):
@@ -92,7 +91,7 @@ class SonoffLANModeClient:
         if self.my_service_name is None:
 
             info = zeroconf.get_service_info(type, name)
-            self.logger.info("ServiceInfo: %s", info)
+            # self.logger.info("ServiceInfo: %s", info)
             found_ip = self.parseAddress(info.address)
 
             if self.device_id != "":
@@ -127,34 +126,22 @@ class SonoffLANModeClient:
                 socket_text = found_ip + ":" + str(info.port)          
                 self.logger.debug("service is at %s", socket_text)
                 self.url = 'http://' + socket_text + '/zeroconf/switch'
-                self.logger.debug("url for switch is %s", self.url)
 
                 # setup retries (https://urllib3.readthedocs.io/en/latest/reference/urllib3.util.html#urllib3.util.retry.Retry)
                 from requests.adapters import HTTPAdapter
                 from urllib3.util.retry import Retry
 
-                # retries for approx 10 retries (5 mins) (time for timeout of service)
-                # todo: no retries at moment, lets see what failure we get
+                # no retries at moment using requests class, control in sonoffdevice (review after seeing what failure we get)
                 retries = Retry(total=0, backoff_factor=0.5, method_whitelist=['POST'], status_forcelist=None)
                 self.http_session.mount('http://', HTTPAdapter(max_retries=retries))
 
                 # process the initial message
                 self.update_service(zeroconf, type, name)
 
-            else:
-
-                self.logger.debug("%s: Service type %s of name %s added", self.my_service_name, type, name) 
-
-        else:
-
-            self.logger.debug("%s: Service type %s of name %s added", self.my_service_name, type, name) 
-
-
     def update_service(self, zeroconf, type, name):
 
         if self.my_service_name == name:
 
-            self.logger.debug("Service %s updated" % name)
             info = zeroconf.get_service_info(type, name)
             self.logger.debug("properties: %s",info.properties)
 
@@ -163,16 +150,16 @@ class SonoffLANModeClient:
                 iv = info.properties.get(b'iv')
                 data1 = info.properties.get(b'data1')
                 plaintext = self.decrypt(data1,iv)
-                self.data = plaintext
+                data = plaintext
                 self.logger.debug("decrypted data: %s", plaintext)
 
             else:
-                self.data = info.properties.get(b'data1')
+                data = info.properties.get(b'data1')
+
+            self.properties = info.properties
 
             # process the events on an event loop (this method is on a background thread called from zeroconf)
-            asyncio.run_coroutine_threadsafe(self.event_handler(self.data), self.loop)
-
-            self.logger.debug('exiting update_service')
+            asyncio.run_coroutine_threadsafe(self.event_handler(data), self.loop)
 
     async def send(self, request: Union[str, Dict]):
         """
@@ -190,7 +177,7 @@ class SonoffLANModeClient:
 
         if response_json['error'] != 0:
             self.logger.warn('error received: %s', response.content)
-            # todo: think about how to process errors, or if retry in calling routine is sufficient
+            # no need to process error, retry will resend message which should be sufficient
         else:
             self.logger.debug('message sent to switch successfully') 
             # no need to do anything here, the update is processed via the mDNS TXT record update
@@ -200,7 +187,6 @@ class SonoffLANModeClient:
         payload = {
             'sequence': str(int(time.time())), # ensure this field isn't too long, otherwise buffer overflow type issue caused in the device
             'deviceid': device_id,
-            #'selfApikey': 'cb0ff096-2a9d-4250-93ec-362fc1fe6f40',  # No apikey needed in LAN mode
             'selfApikey': '123',  # This field need to exist, but no idea what it is used for (https://github.com/itead/Sonoff_Devices_DIY_Tools/issues/5)
             'data': json.dumps(params)
         }
@@ -224,7 +210,7 @@ class SonoffLANModeClient:
 
     def encrypt(self, data_element, iv):
 
-        ApiKey = bytes(self.api_key, 'utf-8') # b'3c1433d8-a02c-479a-a126-ac9438e6bfe5' # [INSERT_TEST_API_KEY_HERE]
+        ApiKey = bytes(self.api_key, 'utf-8') 
         plaintext = bytes(data_element, 'utf-8')
 
         h = MD5.new()
@@ -243,9 +229,7 @@ class SonoffLANModeClient:
 
     def decrypt(self, data_element, iv):
 
-        self.logger.debug('decrypt() entry: %s', self.api_key)
-
-        ApiKey = bytes(self.api_key, 'utf-8') # b'3c1433d8-a02c-479a-a126-ac9438e6bfe5' # [INSERT_TEST_API_KEY_HERE]
+        ApiKey = bytes(self.api_key, 'utf-8')
         encoded =  data_element
 
         h = MD5.new()

@@ -34,8 +34,6 @@ class SonoffDevice(object):
         self.callback_after_update = callback_after_update
         self.host = host
         self.context = context
-        # todo: fix overload with device_id property 
-        # self.device_id = device_id
         self.api_key = api_key
         self.shared_state = shared_state
         self.basic_info = None
@@ -89,7 +87,7 @@ class SonoffDevice(object):
 
         try:
 
-            wait_times = [0.5,1,2,5,10,30,60]                                   # increasing backoff each retry attempt
+            wait_times = [2,5,10,30,60]                                   # increasing backoff each retry attempt
 
             if retry_count >= len(wait_times):
                 retry_count = len(wait_times) -1
@@ -161,8 +159,6 @@ class SonoffDevice(object):
                     self.message_ping_event.clear()
                     self.message_acknowledged_event.clear()
                     await self.client.send(update_message)                    
-
-                    self.client.update_service(self.client.zeroconf, SonoffLANModeClient.SERVICE_TYPE, self.client.my_service_name)
 
                     await asyncio.wait_for(self.message_ping_event.wait(), self.calculate_retry(retry_count))
 
@@ -327,7 +323,7 @@ class SonoffDevice(object):
         :return: Device ID.
         :rtype: str
         """
-        return self.basic_info['deviceid']
+        return self.client.properties[b'id']
 
     async def turn_off(self) -> None:
         """
