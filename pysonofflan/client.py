@@ -10,7 +10,7 @@ import enum
 import traceback
 
 import requests
-from zeroconf23 import ServiceBrowser, Zeroconf
+from .zeroconf23 import ServiceBrowser, Zeroconf
 
 from Crypto.Hash import MD5
 from Crypto.Cipher import AES
