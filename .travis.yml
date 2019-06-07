@@ -6,8 +6,8 @@ python:
 sudo: required
 dist: xenial
 install:
-  - pip install -U tox-travis coveralls
   - pip install -r requirements.txt
+  - pip install -U tox-travis coveralls
 script: tox
 after_success:
   - coveralls
