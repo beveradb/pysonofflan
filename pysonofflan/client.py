@@ -10,7 +10,7 @@ import enum
 import traceback
 
 import requests
-import zeroconf.zeroconf
+from zeroconf import ServiceBrowser, Zeroconf
 
 from Crypto.Hash import MD5
 from Crypto.Cipher import AES
@@ -53,7 +53,7 @@ class SonoffLANModeClient:
         self.connected_event = asyncio.Event()
         self.disconnected_event = asyncio.Event()
         self.service_browser = None
-        self.zeroconf = zeroconf23.zeroconf.Zeroconf()
+        self.zeroconf = Zeroconf()
         self.loop = loop
         self.http_session = None
         self.my_service_name = None
@@ -67,7 +67,7 @@ class SonoffLANModeClient:
         """
 
         # listen for any added SOnOff
-        self.service_browser = zeroconf23.zeroconf.ServiceBrowser(self.zeroconf, SonoffLANModeClient.SERVICE_TYPE, listener=self)
+        self.service_browser = ServiceBrowser(self.zeroconf, SonoffLANModeClient.SERVICE_TYPE, listener=self)
 
     def close_connection(self):
 
@@ -110,7 +110,7 @@ class SonoffLANModeClient:
                 self.logger.info("Service type %s of name %s added", type, name) 
 
                 # listen for updates to the specific device
-                self.service_browser = zeroconf23.zeroconf.ServiceBrowser(zeroconf, name, listener=self)
+                self.service_browser = ServiceBrowser(zeroconf, name, listener=self)
 
                 # create an http session so we can use http keep-alives
                 self.http_session = requests.Session()
