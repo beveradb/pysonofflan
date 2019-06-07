@@ -10,13 +10,4 @@ install:
 script: tox
 after_success:
   - coveralls
-deploy:
-  provider: pypi
-  distributions: sdist bdist_wheel
-  user: beveradb
-  password:
-    secure: B2GjQNy6YqcxJyjqVifLIdcSbrfWQdwxROj//4Ii6EX4bEohwo+Apdec488kJZ8CLYf6Fry1lf8wpN6OYU531Pt5BNPNG8MCAGfr5HTdtsV8ihrjr6vhC1USE9cqmnNWjpIPB7k6UaWELcsYSloeYrfgY/PQECigUtgmZt1BZHHO/3RfdaVxzO58Ye4gLV7uq7DPHOq8aExhgwO2WZyFLI21hiG03BxJ27gUKVIxz3bG+SDrbS3OCdOKCUr4471nCHCcVMAJl0g2FTAR6XqpBeUqveCfKu0dNDM7EtsloCaBZOzD2xJzJY5tTOKEZGLCCaEZlx+jMbZrI4XJyEOBNyYhXTS6lkR3xQHSAIL/Is0b+MulK0Zx1rXKdf/iijXo4dWmn89ca9s4iUu8Ks/ajzZ4LCyJzXZeKfWdB/M/4RAt6cysIWLkttkYSu1YTxF0+c85yBdlZh4b7/DfOJMzWQ6vf/AyeEwQrje+pdABeiAkk16LZZtv02jiqEXOFgmq+msDQWLf2C34z7hoQf97fRlkJ56wr0tmneFYUR30xWrRp/aZW0dqy/wREfj3xGZm6sW9PbgliXyAnWS8R1Yq7mCtA4j8MtiE40lg08WZVeG0GED9zgXXTFTx8qX3xMiwRu4TioSjAk9+5vYVkD04Vtax7uut0U1U6fY3dQSLjTE=
-  on:
-    tags: true
-    repo: beveradb/pysonofflan
-    python: 3.7
+
