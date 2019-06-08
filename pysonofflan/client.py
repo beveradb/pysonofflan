@@ -94,16 +94,22 @@ class SonoffLANModeClient:
             # self.logger.info("ServiceInfo: %s", info)
             found_ip = self.parseAddress(info.address)
 
-            if self.device_id != "":
+            if self.device_id is not None:
 
                 if name == "eWeLink_" + self.device_id + "." + SonoffLANModeClient.SERVICE_TYPE:
                     self.my_service_name = name
 
-            elif self.host != "":
+            elif self.host is not None:
 
-                if socket.gethostbyname(self.host) == found_ip:
-                    self.my_service_name = name
+                try:
 
+                    if socket.gethostbyname(self.host) == found_ip:
+                        self.my_service_name = name
+
+                except TypeError:
+
+                    if self.host == found_ip:
+                        self.my_service_name = name
 
             if self.my_service_name is not None:
 
