@@ -261,17 +261,14 @@ class SonoffDevice(object):
             else:                                          
                 # this is a status update message originating from the device
                 # only send client update message if the status has changed
+
+                self.logger.info(
+                    'unsolicited update received from switch: %s',
+                    response['switch'])
+
                 if self.params['switch'] != response['switch']:       
                     self.params = {"switch": response['switch']}
                     send_update = True
-                    self.logger.info(
-                        'unsolicated updated received from switch: %s',
-                        response['switch'])
-
-                else:
-                    self.logger.warn(
-                        'received unexpected update from switch: %s',
-                        response['switch'])
 
             if send_update and self.callback_after_update is not None:
                 await self.callback_after_update(self)

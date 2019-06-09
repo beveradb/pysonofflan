@@ -93,7 +93,6 @@ class SonoffLANModeClient:
 
     def add_service(self, zeroconf, type, name):
 
-
         if self.my_service_name is not None:
         
             if self.my_service_name == name:
@@ -157,31 +156,27 @@ class SonoffLANModeClient:
                 # process the initial message
                 self.update_service(zeroconf, type, name)
 
+
     def update_service(self, zeroconf, type, name):
 
-        if self.my_service_name == name:
+        info = zeroconf.get_service_info(type, name)
+        self.logger.debug("properties: %s",info.properties)
 
-            info = zeroconf.get_service_info(type, name)
-            self.logger.debug("properties: %s",info.properties)
-
-            if info.properties.get(b'encrypt'):
-                # decrypt the message
-                iv = info.properties.get(b'iv')
-                data1 = info.properties.get(b'data1')
-                plaintext = self.decrypt(data1,iv)
-                data = plaintext
-                self.logger.debug("decrypted data: %s", plaintext)
-
-            else:
-                data = info.properties.get(b'data1')
-
-            self.properties = info.properties
-
-            # process the events on an event loop (this method is on a background thread called from zeroconf)
-            asyncio.run_coroutine_threadsafe(self.event_handler(data), self.loop)
+        if info.properties.get(b'encrypt'):
+            # decrypt the message
+            iv = info.properties.get(b'iv')
+            data1 = info.properties.get(b'data1')
+            plaintext = self.decrypt(data1,iv)
+            data = plaintext
+            self.logger.debug("decrypted data: %s", plaintext)
 
         else:
-            self.logger.error("Service %s updated (but shouldn't be notified, only want: %s)", name, self.my_service_name)
+            data = info.properties.get(b'data1')
+
+        self.properties = info.properties
+
+        # process the events on an event loop (this method is on a background thread called from zeroconf)
+        asyncio.run_coroutine_threadsafe(self.event_handler(data), self.loop)
 
 
     def send_switch(self, request: Union[str, Dict]):
