@@ -7,6 +7,8 @@ import json
 import logging
 from typing import Callable, Awaitable, Dict
 
+import traceback
+
 from .client import SonoffLANModeClient
 
 
@@ -162,10 +164,8 @@ class SonoffDevice(object):
                     self.message_ping_event.clear()
                     self.message_acknowledged_event.clear()
 
-                    # run send() in a thread as this is a blocking call
-                    # await self.client.send(update_message)
                     await self.loop.run_in_executor(None,
-                        self.client.send, update_message)
+                        self.client.send_switch, update_message)
                             
                     await asyncio.wait_for(
                         self.message_ping_event.wait(),
@@ -197,14 +197,14 @@ class SonoffDevice(object):
                     break
 
                 except Exception as ex:
-                    self.logger.error('Unexpected error in send(): %s', format(ex))
+                    self.logger.error('Unexpected error in send_updated_params_loop: %s %s', format(ex), traceback.format_exc)
                     break
 
         except asyncio.CancelledError:
             self.logger.debug('send_updated_params_loop cancelled')
 
         except Exception as ex:
-            self.logger.error('Unexpected error in send(): %s', format(ex))
+            self.logger.error('Unexpected error in send_updated_params_loop: %s', format(ex))
 
         finally:
             self.logger.debug('send_updated_params_loop finally block reached')
@@ -249,7 +249,6 @@ class SonoffDevice(object):
                 if self.params['switch'] == response['switch']:
  
                     self.message_acknowledged_event.set()
-                    #self.params_updated_event.clear() 
                     send_update = True
                     self.logger.debug('expected update received from switch: %s',
                         response['switch'])
@@ -311,7 +310,6 @@ class SonoffDevice(object):
 
             # Keep the event loop running until it is either
             # destroyed or all tasks have really terminated
-
             if self.new_loop:
                 while (
                     not tasks.done()

@@ -55,10 +55,10 @@ class SonoffLANModeClient:
         self.connected_event = asyncio.Event()
         self.disconnected_event = asyncio.Event()
         self.service_browser = None
-        # self.zeroconf = Zeroconf()
         self.loop = loop
         self.http_session = None
         self.my_service_name = None
+        self.last_request = None
 
         if self.logger is None:
             self.logger = logging.getLogger(__name__)
@@ -68,14 +68,7 @@ class SonoffLANModeClient:
         Setup a mDNS listener
         """
 
-        """
-        if self.device_id is not None:
-
-            my_service_name = "eWeLink_" + self.device_id + "." + SonoffLANModeClient.SERVICE_TYPE
-            self.service_browser = ServiceBrowser(self.zeroconf, my_service_name, listener=self)
-
-        else:
-        """    # listen for any added SOnOff
+        # listen for any added SOnOff
         self.service_browser = ServiceBrowser(SonoffLANModeClient.zeroconf, SonoffLANModeClient.SERVICE_TYPE, listener=self)
 
     def close_connection(self):
@@ -92,8 +85,11 @@ class SonoffLANModeClient:
 
             self.close_connection()
 
-        else:
-            self.logger.debug("Service %s removed (not our switch)" % name)
+            # hack! send a wake-up message to the switch to see if its still there
+            self.send_signal_strength(self.get_update_payload(self.device_id, None))
+
+        #else:
+        #    self.logger.debug("Service %s removed (not our switch)" % name)
 
     def add_service(self, zeroconf, type, name):
 
@@ -103,13 +99,12 @@ class SonoffLANModeClient:
             if self.my_service_name == name:
                 self.logger.error("Service %s added (again!?)" % name)
 
-            else:
-                self.logger.debug("Service %s added (not our switch)" % name)
+            #else:
+            #    self.logger.debug("Service %s added (not our switch)" % name)
 
         else:
 
             info = zeroconf.get_service_info(type, name)
-            # self.logger.info("ServiceInfo: %s", info)
             found_ip = self.parseAddress(info.address)
 
             if self.device_id is not None:
@@ -149,7 +144,7 @@ class SonoffLANModeClient:
                 # find socket for end-point
                 socket_text = found_ip + ":" + str(info.port)          
                 self.logger.debug("service is at %s", socket_text)
-                self.url = 'http://' + socket_text + '/zeroconf/switch'
+                self.url = 'http://' + socket_text
 
                 # setup retries (https://urllib3.readthedocs.io/en/latest/reference/urllib3.util.html#urllib3.util.retry.Retry)
                 from requests.adapters import HTTPAdapter
@@ -186,10 +181,22 @@ class SonoffLANModeClient:
             asyncio.run_coroutine_threadsafe(self.event_handler(data), self.loop)
 
         else:
-            self.logger.error("Service %s updated (but shouldn't be notified, only want: %s)", name, my_service_name)
+            self.logger.error("Service %s updated (but shouldn't be notified, only want: %s)", name, self.my_service_name)
 
 
-    def send(self, request: Union[str, Dict]):
+    def send_switch(self, request: Union[str, Dict]):
+
+        try:
+            self.send(request, self.url + '/zeroconf/switch')
+
+        except Exception as ex:
+            self.logger.error('Unexpected error in send_switch(): %s %s', format(ex), traceback.format_exc)
+
+    def send_signal_strength(self, request: Union[str, Dict]):
+
+        self.send(request, self.url + '/zeroconf/signal_strength')
+
+    def send(self, request: Union[str, Dict], url):
         """
         Send message to an already-connected Sonoff LAN Mode Device
         and return the response.
@@ -197,19 +204,25 @@ class SonoffLANModeClient:
         :return:
         """
 
-        self.logger.debug('Sending http message: %s', request)      
-        response = self.http_session.post(self.url, json=request)
-        self.logger.debug('response received: %s %s', response, response.content) 
+        try:
 
-        response_json = json.loads(response.content)
+            self.logger.debug('Sending http message to %s: %s ', url, request)      
+            response = self.http_session.post(url, json=request)
+            self.logger.debug('response received: %s %s', response, response.content) 
 
-        if response_json['error'] != 0:
-            self.logger.warn('error received: %s', response.content)
-            # no need to process error, retry will resend message which should be sufficient
-        else:
-            self.logger.debug('message sent to switch successfully') 
-            # no need to do anything here, the update is processed via the mDNS TXT record update
-            
+            response_json = json.loads(response.content)
+
+            if response_json['error'] != 0:
+                self.logger.warn('error received: %s', response.content)
+                # no need to process error, retry will resend message which should be sufficient
+            else:
+                self.logger.debug('message sent to switch successfully') 
+                # no need to do anything here, the update is processed via the mDNS TXT record update
+
+        except Exception as ex:
+            self.logger.error('Unexpected error in send(): %s %s', format(ex), traceback.format_exc)
+
+
     def get_update_payload(self, device_id: str, params: dict) -> Dict:
 
         payload = {
