@@ -7,9 +7,6 @@ import json
 import logging
 from typing import Callable, Awaitable, Dict
 
-import traceback
-import websockets
-
 from .client import SonoffLANModeClient
 
 
