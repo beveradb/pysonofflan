@@ -6,10 +6,10 @@ python:
 sudo: required
 dist: xenial
 install:
-  - pip install -U tox-travis coveralls flake8
+  - pip install -U tox-travis coveralls
 script:
   - tox
 after_success:
   - coveralls
-  - flake8 --exclude=.tox/py,.eggs
+  
   
