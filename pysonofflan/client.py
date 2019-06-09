@@ -81,12 +81,13 @@ class SonoffLANModeClient:
     def remove_service(self, zeroconf, type, name):
 
         if self.my_service_name == name:
-            self.logger.warn("Service %s removed" % name)
-
-            self.close_connection()
 
             # hack! send a wake-up message to the switch to see if its still there
-            self.send_signal_strength(self.get_update_payload(self.device_id, None))
+            if self.send_signal_strength(self.get_update_payload(self.device_id, None)) != 0:
+                self.logger.warn("Service %s removed" % name)
+                self.close_connection()
+            
+            self.logger.debug("Service %s removed (but hack worked)" % name)
 
         #else:
         #    self.logger.debug("Service %s removed (not our switch)" % name)
@@ -96,13 +97,14 @@ class SonoffLANModeClient:
         if self.my_service_name is not None:
         
             if self.my_service_name == name:
-                self.logger.error("Service %s added (again!?)" % name)
+                self.logger.debug("Service %s added (again, likely after hack)" % name)
+                self.my_service_name = None
 
             #else:
             #    self.logger.debug("Service %s added (not our switch)" % name)
 
-        else:
-
+        if self.my_service_name is None:
+        
             info = zeroconf.get_service_info(type, name)
             found_ip = self.parseAddress(info.address)
 
@@ -182,14 +184,14 @@ class SonoffLANModeClient:
     def send_switch(self, request: Union[str, Dict]):
 
         try:
-            self.send(request, self.url + '/zeroconf/switch')
+            return self.send(request, self.url + '/zeroconf/switch')
 
         except Exception as ex:
             self.logger.error('Unexpected error in send_switch(): %s %s', format(ex), traceback.format_exc)
 
     def send_signal_strength(self, request: Union[str, Dict]):
 
-        self.send(request, self.url + '/zeroconf/signal_strength')
+        return self.send(request, self.url + '/zeroconf/signal_strength')
 
     def send(self, request: Union[str, Dict], url):
         """
@@ -207,12 +209,17 @@ class SonoffLANModeClient:
 
             response_json = json.loads(response.content)
 
-            if response_json['error'] != 0:
+            error = response_json['error']
+
+            if error != 0:
                 self.logger.warn('error received: %s', response.content)
                 # no need to process error, retry will resend message which should be sufficient
+
             else:
                 self.logger.debug('message sent to switch successfully') 
                 # no need to do anything here, the update is processed via the mDNS TXT record update
+
+            return error
 
         except Exception as ex:
             self.logger.error('Unexpected error in send(): %s %s', format(ex), traceback.format_exc)
