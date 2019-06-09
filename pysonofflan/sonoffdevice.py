@@ -158,8 +158,11 @@ class SonoffDevice(object):
                 try:
                     self.message_ping_event.clear()
                     self.message_acknowledged_event.clear()
-                    await self.client.send(update_message)                    
-
+                    
+                    # run the send message in a thread as this is a blocking call
+                    #await self.client.send(update_message)          
+                    await self.loop.run_in_executor(None, self.client.send, update_message)
+                            
                     await asyncio.wait_for(self.message_ping_event.wait(), self.calculate_retry(retry_count))
 
                     if self.message_acknowledged_event.is_set():

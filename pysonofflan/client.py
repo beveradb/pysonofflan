@@ -36,6 +36,8 @@ class SonoffLANModeClient:
     DEFAULT_PING_INTERVAL = 5
     SERVICE_TYPE = "_ewelink._tcp.local."
 
+    zeroconf = Zeroconf()
+
     def __init__(self, host: str,
                  event_handler: Callable[[str], Awaitable[None]],
                  ping_interval: int = DEFAULT_PING_INTERVAL,
@@ -53,7 +55,7 @@ class SonoffLANModeClient:
         self.connected_event = asyncio.Event()
         self.disconnected_event = asyncio.Event()
         self.service_browser = None
-        self.zeroconf = Zeroconf()
+        # self.zeroconf = Zeroconf()
         self.loop = loop
         self.http_session = None
         self.my_service_name = None
@@ -66,8 +68,15 @@ class SonoffLANModeClient:
         Setup a mDNS listener
         """
 
-        # listen for any added SOnOff
-        self.service_browser = ServiceBrowser(self.zeroconf, SonoffLANModeClient.SERVICE_TYPE, listener=self)
+        """
+        if self.device_id is not None:
+
+            my_service_name = "eWeLink_" + self.device_id + "." + SonoffLANModeClient.SERVICE_TYPE
+            self.service_browser = ServiceBrowser(self.zeroconf, my_service_name, listener=self)
+
+        else:
+        """    # listen for any added SOnOff
+        self.service_browser = ServiceBrowser(SonoffLANModeClient.zeroconf, SonoffLANModeClient.SERVICE_TYPE, listener=self)
 
     def close_connection(self):
 
@@ -84,11 +93,20 @@ class SonoffLANModeClient:
             self.close_connection()
 
         else:
-            self.logger.debug("%s: Service %s removed", self.my_service_name, name)
+            self.logger.error("Service %s removed (shouldn't be notified)" % name)
 
     def add_service(self, zeroconf, type, name):
 
-        if self.my_service_name is None:
+
+        if self.my_service_name is not None:
+        
+            if self.my_service_name == name:
+                self.logger.error("Service %s added (again!?)" % name)
+
+            else:
+                self.logger.debug("Service %s added (not our switch)" % name)
+
+        else:
 
             info = zeroconf.get_service_info(type, name)
             # self.logger.info("ServiceInfo: %s", info)
@@ -167,7 +185,11 @@ class SonoffLANModeClient:
             # process the events on an event loop (this method is on a background thread called from zeroconf)
             asyncio.run_coroutine_threadsafe(self.event_handler(data), self.loop)
 
-    async def send(self, request: Union[str, Dict]):
+        else:
+            self.logger.error("Service %s updated (but should be notified)" % name)
+
+
+    def send(self, request: Union[str, Dict]):
         """
         Send message to an already-connected Sonoff LAN Mode Device
         and return the response.
