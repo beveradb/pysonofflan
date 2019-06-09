@@ -10,5 +10,5 @@ install:
 script: tox
 after_success:
   - coveralls
-  - flake8
+  - flake8 --exclude=.tox
 

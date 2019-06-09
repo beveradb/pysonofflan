@@ -37,10 +37,10 @@ class SonoffDevice(object):
         self.api_key = api_key
         self.shared_state = shared_state
         self.basic_info = None
-        self.params = { "switch": "unknown"}
+        self.params = {"switch": "unknown"}
         self.loop = loop
-        self.tasks = []                                                 # store the tasks that this module create s in a sequence
-        self.new_loop = False                                           # use to decide if we should shutdown the loop on exit
+        self.tasks = []
+        self.new_loop = False
 
         if logger is None:
             self.logger = logging.getLogger(__name__)
@@ -73,8 +73,11 @@ class SonoffDevice(object):
 
             self.client.connect()
              
-            self.tasks.append(self.loop.create_task(self.send_availability_loop()))    
-            self.send_updated_params_task = self.loop.create_task(self.send_updated_params_loop())
+            self.tasks.append(
+                self.loop.create_task(self.send_availability_loop()))
+
+            self.send_updated_params_task = \
+                self.loop.create_task(self.send_updated_params_loop())
             self.tasks.append(self.send_updated_params_task)
 
             if self.new_loop:
@@ -87,21 +90,23 @@ class SonoffDevice(object):
 
         try:
 
-            wait_times = [2,5,10,30,60]                                   # increasing backoff each retry attempt
+            # increasing backoff each retry attempt
+            wait_times = [2, 5, 10, 30, 60]
 
             if retry_count >= len(wait_times):
-                retry_count = len(wait_times) -1
+                retry_count = len(wait_times) - 1
 
             wait_time = wait_times[retry_count]
 
             return wait_time
 
         except Exception as ex:
-            self.logger.error('Unexpected error in wait_before_retry(): %s', format(ex) )        
+            self.logger.error('Unexpected error in wait_before_retry(): %s',
+                format(ex))
 
     async def send_availability_loop(self):
 
-        self.logger.debug('enter send_availability_loop()')  
+        self.logger.debug('enter send_availability_loop()')
 
         try:
             while True:
@@ -129,8 +134,9 @@ class SonoffDevice(object):
         finally:
             self.logger.debug('exiting send_availability_loop()')
 
-    
+
     async def send_updated_params_loop(self):
+
         self.logger.debug(
             'send_updated_params_loop is active on the event loop')
 
@@ -141,12 +147,12 @@ class SonoffDevice(object):
             self.logger.debug(
                 'Starting loop waiting for device params to change')
 
-            while True:                                                     
+            while True:
                 self.logger.debug(
                     'send_updated_params_loop now awaiting event')
 
                 await self.params_updated_event.wait()
-                
+
                 await self.client.connected_event.wait()
                 self.logger.debug('Connected!')                
 
@@ -158,29 +164,34 @@ class SonoffDevice(object):
                 try:
                     self.message_ping_event.clear()
                     self.message_acknowledged_event.clear()
-                    
-                    # run the send message in a thread as this is a blocking call
-                    #await self.client.send(update_message)          
-                    await self.loop.run_in_executor(None, self.client.send, update_message)
+
+                    # run send() in a thread as this is a blocking call
+                    # await self.client.send(update_message)
+                    await self.loop.run_in_executor(None,
+                        self.client.send, update_message)
                             
-                    await asyncio.wait_for(self.message_ping_event.wait(), self.calculate_retry(retry_count))
+                    await asyncio.wait_for(
+                        self.message_ping_event.wait(),
+                        self.calculate_retry(retry_count))
 
                     if self.message_acknowledged_event.is_set():
-                        self.params_updated_event.clear() 
-                        self.logger.debug('Update message sent, event cleared, should '
-                                    'loop now')
+                        self.params_updated_event.clear()
+                        self.logger.debug('Update message sent, '
+                            'event cleared, should loop now')
                         retry_count = 0
                     else:
                         self.logger.warn(
-                            "we didn't get a confirmed acknowledgement, state has changed in between retry!")
+                            "we didn't get a confirmed acknowledgement,"
+                            "state has changed in between retry!")
                         retry_count += 1
                     
-                except asyncio.TimeoutError:                     
-                    self.logger.warn('Update message not received in timeout period, retry')
+                except asyncio.TimeoutError:
+                    self.logger.warn(
+                        'Update message not received in timeout period, retry')
                     retry_count += 1
 
                 except OSError as ex:
-                    self.logger.warn('OSError in send(): %s', format(ex) )
+                    self.logger.warn('OSError in send(): %s', format(ex))
                     await asyncio.sleep(self.calculate_retry(retry_count))
                     retry_count += 1
 
@@ -189,16 +200,14 @@ class SonoffDevice(object):
                     break
 
                 except Exception as ex:
-                    self.logger.error('Unexpected error in send(): %s', format(ex) )
+                    self.logger.error('Unexpected error in send(): %s', format(ex))
                     break
-
-
 
         except asyncio.CancelledError:
             self.logger.debug('send_updated_params_loop cancelled')
 
         except Exception as ex:
-            self.logger.error('Unexpected error in send(): %s', format(ex) )
+            self.logger.error('Unexpected error in send(): %s', format(ex))
 
         finally:
             self.logger.debug('send_updated_params_loop finally block reached')
@@ -206,7 +215,7 @@ class SonoffDevice(object):
     def update_params(self, params):
         self.logger.debug(
             'Scheduling params update message to device: %s' % params
-        )    
+        )
 
         self.params = params
         self.params_updated_event.set()
@@ -219,13 +228,13 @@ class SonoffDevice(object):
 
         self.logger.debug('enter handle_mesage()')
 
-        self.message_ping_event.set() 
+        self.message_ping_event.set()
 
         response = json.loads(message)
 
         if ('switch' in response):
             self.logger.debug(
-                'Message: Received switch updates from device, storing in instance')
+                'Message: Received status from device, storing in instance')
             self.basic_info = response
             self.basic_info['deviceid'] = self.host
 
@@ -233,29 +242,37 @@ class SonoffDevice(object):
 
             send_update = False
 
-            if self.params_updated_event.is_set():          # is there is a new message queued to be sent
+            # is there is a new message queued to be sent
+            if self.params_updated_event.is_set():
                 
-                if self.params['switch'] == response['switch']:       # only send client update message if the change has been successful
+                # only send client update message if the change has been successful
+                if self.params['switch'] == response['switch']:
  
                     self.message_acknowledged_event.set()
                     #self.params_updated_event.clear() 
                     send_update = True
-                    self.logger.debug('expected update received from switch: %s', response['switch'])
+                    self.logger.debug('expected update received from switch: %s',
+                        response['switch'])
 
                 else:                   
-                    self.logger.warn('failed update! state is: %s, expecting: %s', response['switch'], self.params['switch'])
+                    self.logger.warn(
+                        'failed update! state is: %s, expecting: %s',
+                        response['switch'], self.params['switch'])
 
-            else:                                           # otherwise this is a status update message originating from the device
-
-                if self.params['switch'] != response['switch']:       # only send client update message if the status has changed
+            else:                                          
+                # this is a status update message originating from the device
+                # only send client update message if the status has changed
+                if self.params['switch'] != response['switch']:       
                     self.params = {"switch": response['switch']}
                     send_update = True
-                    self.logger.info('unsolicated updated received from switch: %s', response['switch'])
+                    self.logger.info(
+                        'unsolicated updated received from switch: %s',
+                        response['switch'])
 
                 else:
-                    self.logger.warn('received unexpected update from switch: %s', response['switch'])
-
-
+                    self.logger.warn(
+                        'received unexpected update from switch: %s',
+                        response['switch'])
 
             if send_update and self.callback_after_update is not None:
                 await self.callback_after_update(self)
@@ -264,6 +281,8 @@ class SonoffDevice(object):
             self.logger.error(
                 'Unknown message received from device: ' % message)
             raise Exception('Unknown message received from device')
+    
+    
     def shutdown_event_loop(self):
         self.logger.debug('shutdown_event_loop called')
 
@@ -284,10 +303,10 @@ class SonoffDevice(object):
                 loop=self.loop,
                 return_exceptions=True
             )
-           
+
             if self.new_loop:
                 tasks.add_done_callback(lambda t: self.loop.stop())
-    
+
             tasks.cancel()
 
             # Keep the event loop running until it is either
@@ -300,9 +319,11 @@ class SonoffDevice(object):
                     and not self.loop.is_running()
                 ):
                     self.loop.run_forever()
-        
+
         except Exception as ex:
-                self.logger.error('Unexpected error in shutdown_event_loop(): %s', format(ex) )
+            self.logger.error(
+                'Unexpected error in shutdown_event_loop(): %s',
+                format(ex))
 
         finally:
             if self.new_loop:
@@ -316,7 +337,6 @@ class SonoffDevice(object):
                         self.loop.shutdown_asyncgens()
                     )
                     self.loop.close()
-            
 
     @property
     def device_id(self) -> str:
