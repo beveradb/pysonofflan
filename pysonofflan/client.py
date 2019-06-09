@@ -188,10 +188,18 @@ class SonoffLANModeClient:
 
         except Exception as ex:
             self.logger.error('Unexpected error in send_switch(): %s %s', format(ex), traceback.format_exc)
+            return 1
+
 
     def send_signal_strength(self, request: Union[str, Dict]):
 
-        return self.send(request, self.url + '/zeroconf/signal_strength')
+        try:
+            return self.send(request, self.url + '/zeroconf/signal_strength')
+
+        except Exception as ex:
+            self.logger.error('Unexpected error in send_switch(): %s %s', format(ex), traceback.format_exc)
+            return 1
+
 
     def send(self, request: Union[str, Dict], url):
         """
@@ -201,28 +209,23 @@ class SonoffLANModeClient:
         :return:
         """
 
-        try:
+        self.logger.debug('Sending http message to %s: %s ', url, request)      
+        response = self.http_session.post(url, json=request)
+        self.logger.debug('response received: %s %s', response, response.content) 
 
-            self.logger.debug('Sending http message to %s: %s ', url, request)      
-            response = self.http_session.post(url, json=request)
-            self.logger.debug('response received: %s %s', response, response.content) 
+        response_json = json.loads(response.content)
 
-            response_json = json.loads(response.content)
+        error = response_json['error']
 
-            error = response_json['error']
+        if error != 0:
+            self.logger.warn('error received: %s', response.content)
+            # no need to process error, retry will resend message which should be sufficient
 
-            if error != 0:
-                self.logger.warn('error received: %s', response.content)
-                # no need to process error, retry will resend message which should be sufficient
+        else:
+            self.logger.debug('message sent to switch successfully') 
+            # no need to do anything here, the update is processed via the mDNS TXT record update
 
-            else:
-                self.logger.debug('message sent to switch successfully') 
-                # no need to do anything here, the update is processed via the mDNS TXT record update
-
-            return error
-
-        except Exception as ex:
-            self.logger.error('Unexpected error in send(): %s %s', format(ex), traceback.format_exc)
+        return error
 
 
     def get_update_payload(self, device_id: str, params: dict) -> Dict:
