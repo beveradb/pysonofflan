@@ -23,7 +23,7 @@ class TestCLI(unittest.TestCase):
         """Test the CLI."""
         runner = CliRunner()
         result = runner.invoke(cli.cli)
-        assert 'No host name given, see usage below' in result.output
+        assert 'No host name or device_id given, see usage below' in result.output
         assert 'Commands:' in result.output
 
     def test_cli_invalid_arg(self):
@@ -62,7 +62,16 @@ class TestCLI(unittest.TestCase):
         """Test the CLI."""
         runner = CliRunner()
         result = runner.invoke(cli.cli, ['state'])
-        assert 'No host name given, see usage below' in result.output
+        assert 'No host name or device_id given, see usage below' in result.output
+
+# remove until I decide how to deal with waiting for connection        
+#    def test_cli_unconnectable_host_state(self):
+#        """Test the CLI."""
+#        runner = CliRunner()
+#        result = runner.invoke(cli.cli, ['--host', '127.0.0.100', 'state'])
+#        assert 'Initialising SonoffSwitch with host 127.0.0.100' in \
+#               result.output
+#        assert 'Unable to connect' in result.output
 
     def test_cli_discover(self):
         """Test the CLI."""
