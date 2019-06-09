@@ -23,7 +23,7 @@ class TestCLI(unittest.TestCase):
         """Test the CLI."""
         runner = CliRunner()
         result = runner.invoke(cli.cli)
-        assert 'No host name or device_id given, see usage below' in result.output
+        assert 'No host name given, see usage below' in result.output
         assert 'Commands:' in result.output
 
     def test_cli_invalid_arg(self):
@@ -62,7 +62,7 @@ class TestCLI(unittest.TestCase):
         """Test the CLI."""
         runner = CliRunner()
         result = runner.invoke(cli.cli, ['state'])
-        assert 'No host name or device_id given, see usage below' in result.output
+        assert 'No host name given, see usage below' in result.output
 
     def test_cli_discover(self):
         """Test the CLI."""
