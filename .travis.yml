@@ -9,6 +9,6 @@ install:
   - pip install -U tox-travis coveralls flake8
 script:
   - tox
-  - flake8 --exclude=.tox, .eggs
+  - flake8 --exclude=.tox, .egg
 after_success:
   - coveralls
