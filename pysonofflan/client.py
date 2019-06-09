@@ -93,7 +93,7 @@ class SonoffLANModeClient:
             self.close_connection()
 
         else:
-            self.logger.error("Service %s removed (shouldn't be notified)" % name)
+            self.logger.debug("Service %s removed (not our switch)" % name)
 
     def add_service(self, zeroconf, type, name):
 
@@ -186,7 +186,7 @@ class SonoffLANModeClient:
             asyncio.run_coroutine_threadsafe(self.event_handler(data), self.loop)
 
         else:
-            self.logger.error("Service %s updated (but should be notified)" % name)
+            self.logger.error("Service %s updated (but shouldn't be notified, only want: %s)", name, my_service_name)
 
 
     def send(self, request: Union[str, Dict]):
