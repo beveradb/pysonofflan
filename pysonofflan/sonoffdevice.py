@@ -213,12 +213,15 @@ class SonoffDevice(object):
             self.logger.debug('send_updated_params_loop finally block reached')
 
     def update_params(self, params):
-        self.logger.debug(
-            'Scheduling params update message to device: %s' % params
-        )
 
-        self.params = params
-        self.params_updated_event.set()
+        if self.params != params:
+
+            self.logger.debug(
+                'Scheduling params update message to device: %s' % params)
+            self.params = params
+            self.params_updated_event.set()
+        else:
+            self.logger.debug('unecessary update received, ignoring')
 
     async def handle_message(self, message):
         """
