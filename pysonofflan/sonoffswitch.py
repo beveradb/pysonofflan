@@ -2,7 +2,8 @@ import asyncio
 import logging
 from typing import Callable, Awaitable, Dict
 
-from pysonofflan import SonoffDevice, SonoffLANModeClient
+from .sonoffdevice import SonoffDevice
+from .client import SonoffLANModeClient
 
 
 class SonoffSwitch(SonoffDevice):
@@ -26,6 +27,7 @@ class SonoffSwitch(SonoffDevice):
     SWITCH_STATE_OFF = 'OFF'
     SWITCH_STATE_UNKNOWN = 'UNKNOWN'
 
+
     def __init__(self,
                  host: str,
                  callback_after_update: Callable[
@@ -36,7 +38,9 @@ class SonoffSwitch(SonoffDevice):
                  loop=None,
                  ping_interval=SonoffLANModeClient.DEFAULT_PING_INTERVAL,
                  timeout=SonoffLANModeClient.DEFAULT_TIMEOUT,
-                 context: str = None) -> None:
+                 context: str = None,
+                 device_id: str = None,
+                 api_key: str = None) -> None:
 
         self.inching_seconds = inching_seconds
         self.parent_callback_after_update = callback_after_update
@@ -55,7 +59,9 @@ class SonoffSwitch(SonoffDevice):
             shared_state=shared_state,
             ping_interval=ping_interval,
             timeout=timeout,
-            context=context
+            context=context,
+            device_id=device_id,
+            api_key=api_key
         )
 
     @property

@@ -5,436 +5,299 @@ import random
 import time
 from typing import Dict, Union, Callable, Awaitable
 import asyncio
+import threading
 import enum
+import traceback
 
-import websockets
-from websockets.framing import OP_CLOSE, parse_close, OP_PING, OP_PONG
+import requests
+from zeroconf import ServiceBrowser, Zeroconf
 
-logger = logging.getLogger(__name__)
+from Crypto.Hash import MD5
+from Crypto.Cipher import AES
+from Crypto.Util.Padding import unpad, pad
+from base64 import b64decode, b64encode
+from Crypto.Random import get_random_bytes
 
-V6_DEFAULT_TIMEOUT = 10
-V6_DEFAULT_PING_INTERVAL = 300
-
-class InvalidState(Exception):
-    """
-    Exception raised when an operation is forbidden in the current state.
-    """
-    
-CLOSE_CODES = {
-    1000: "OK",
-    1001: "going away",
-    1002: "protocol error",
-    1003: "unsupported type",
-    # 1004 is reserved
-    1005: "no status code [internal]",
-    1006: "connection closed abnormally [internal]",
-    1007: "invalid data",
-    1008: "policy violation",
-    1009: "message too big",
-    1010: "extension required",
-    1011: "unexpected error",
-    1015: "TLS failure [internal]",
-}
-
-# A WebSocket connection goes through the following four states, in order:
-
-class State(enum.IntEnum):
-    CONNECTING, OPEN, CLOSING, CLOSED = range(4)
-
-class ConnectionClosed(InvalidState):
-    """
-    Exception raised when trying to read or write on a closed connection.
-    Provides the connection close code and reason in its ``code`` and
-    ``reason`` attributes respectively.
-    """
-
-    def __init__(self, code, reason):
-        self.code = code
-        self.reason = reason
-        message = "WebSocket connection is closed: "
-        message += format_close(code, reason)
-        super().__init__(message)
-
-def format_close(code, reason):
-    """
-    Display a human-readable version of the close code and reason.
-    """
-    if 3000 <= code < 4000:
-        explanation = "registered"
-    elif 4000 <= code < 5000:
-        explanation = "private use"
-    else:
-        explanation = CLOSE_CODES.get(code, "unknown")
-    result = "code = {} ({}), ".format(code, explanation)
-
-    if reason:
-        result += "reason = {}".format(reason)
-    else:
-        result += "no reason"
-
-    return result
-
-class SonoffLANModeClientProtocol(websockets.WebSocketClientProtocol):
-    """Customised WebSocket client protocol to ignore pong payload match."""
-
-    @asyncio.coroutine
-    def read_data_frame(self, max_size):
-        """
-        Copied from websockets.WebSocketCommonProtocol to change pong handling
-        """
-        while True:
-            frame = yield from self.read_frame(max_size)
-
-            if frame.opcode == OP_CLOSE:
-                self.close_code, self.close_reason = parse_close(frame.data)
-                yield from self.write_close_frame(frame.data)
-                return
-
-            elif frame.opcode == OP_PING:
-                ping_hex = binascii.hexlify(frame.data).decode() or '[empty]'
-                logger.debug(
-                    "%s - received ping, sending pong: %s", self.side, ping_hex
-                )
-                yield from self.pong(frame.data)
-
-            elif frame.opcode == OP_PONG:
-                # Acknowledge pings on solicited pongs, regardless of payload
-                if self.pings:
-                    ping_id, pong_waiter = self.pings.popitem(0)
-                    ping_hex = binascii.hexlify(ping_id).decode() or '[empty]'
-                    pong_waiter.set_result(None)
-                    logger.debug(
-                        "%s - received pong, clearing most recent ping: %s",
-                        self.side,
-                        ping_hex
-                    )
-                else:
-                    logger.debug(
-                        "%s - received pong, but no pings to clear",
-                        self.side
-                    )
-            else:
-                return frame
-
-    def __init__(self, **kwds):
-
-        logger.debug("__init__()" )
-
-        if float(websockets.__version__) < 7.0:
-
-            self.ping_interval = V6_DEFAULT_PING_INTERVAL
-            self.ping_timeout = V6_DEFAULT_TIMEOUT
-
-            #self.close_code: int
-            #self.close_reason: str
-
-            # Task sending keepalive pings.
-            self.keepalive_ping_task = None
-
-        super().__init__(**kwds)
-
-    def connection_open(self):
-
-        logger.debug("connection_open()")
-
-        super().connection_open()
-
-        if float(websockets.__version__) < 7.0:
-
-            # Start the task that sends pings at regular intervals.
-            self.keepalive_ping_task = asyncio.ensure_future(
-                self.keepalive_ping(), loop=self.loop
-            )
-
-    @asyncio.coroutine
-    def keepalive_ping(self):
-
-        logger.debug("keepalive_ping()" )
-
-        if float(websockets.__version__) >= 7.0:
-
-            super().keepalive_ping()
-
-        else:
-
-            """
-            Send a Ping frame and wait for a Pong frame at regular intervals.
-            This coroutine exits when the connection terminates and one of the
-            following happens:
-            - :meth:`ping` raises :exc:`ConnectionClosed`, or
-            - :meth:`close_connection` cancels :attr:`keepalive_ping_task`.
-            """
-            if self.ping_interval is None:
-                return
-
-            try:
-                while True:
-
-                    yield from asyncio.sleep(self.ping_interval, loop=self.loop)
-
-                    # ping() cannot raise ConnectionClosed, only CancelledError:
-                    # - If the connection is CLOSING, keepalive_ping_task will be
-                    #   canceled by close_connection() before ping() returns.
-                    # - If the connection is CLOSED, keepalive_ping_task must be
-                    #   canceled already.
-
-                    ping_waiter = yield from self.ping()
-
-                    if self.ping_timeout is not None:
-                        try:
-                            yield from asyncio.wait_for(
-                                ping_waiter, self.ping_timeout, loop=self.loop
-                            )
-
-                        except asyncio.TimeoutError:
-                            logger.debug("%s ! timed out waiting for pong", self.side)
-                            self.fail_connection(1011)
-                            break
-
-            except asyncio.CancelledError:
-                raise
-
-            except Exception:
-                logger.warning("Unexpected exception in keepalive ping task", exc_info=True)
-
-    @asyncio.coroutine
-    def close_connection(self):
-
-        logger.debug("close_connection()")
-
-        yield from super().close_connection()
-
-        logger.debug("super.close_connection() finished" )
-
-        if float(websockets.__version__) < 7.0:
-
-            # Cancel the keepalive ping task.
-            if self.keepalive_ping_task is not None:
-                self.keepalive_ping_task.cancel()
-
-
-
-    def abort_keepalive_pings(self):
-
-        logger.debug("abort_keepalive_pings()")
-
-        if float(websockets.__version__) >= 7.0:
-            super().abort_keepalive_pings()
-
-        else:
-
-            """
-            Raise ConnectionClosed in pending keepalive pings.
-            They'll never receive a pong once the connection is closed.
-            """
-            assert self.state is State.CLOSED
-            exc = ConnectionClosed(self.close_code, self.close_reason)
-            exc.__cause__ = self.transfer_data_exc  # emulate raise ... from ...
-
-            try:
-
-                for ping in self.pings.values():
-                    ping.set_exception(exc)
-
-            except asyncio.InvalidStateError:
-                pass
-
-            """ No Need to do this as in V6, this is done in super.close_connection()
-
-            if self.pings:
-                pings_hex = ', '.join(
-                    binascii.hexlify(ping_id).decode() or '[empty]'
-                    for ping_id in self.pings
-                )
-                plural = 's' if len(self.pings) > 1 else ''
-                logger.debug(
-                    "%s - aborted pending ping%s: %s", self.side, plural, pings_hex
-                )"""
-
-    def connection_lost(self, exc):
-
-        logger.debug("connection_lost()" )
-
-        if float(websockets.__version__) < 7.0:
-
-            logger.debug("%s - event = connection_lost(%s)", self.side, exc)
-            self.state = State.CLOSED
-            logger.debug("%s - state = CLOSED", self.side)
-            if self.close_code is None:
-                self.close_code = 1006
-            if self.close_reason is None:
-                self.close_reason = ""
-            logger.debug(
-                "%s x code = %d, reason = %s",
-                self.side,
-                self.close_code,
-                self.close_reason or "[no reason]",
-            )   
-
-            self.abort_keepalive_pings()
-
-        super().connection_lost(exc)
-
-
+import socket
 
 class SonoffLANModeClient:
     """
-    Implementation of the Sonoff LAN Mode Protocol (as used by the eWeLink app)
+    Implementation of the Sonoff LAN Mode Protocol R3(as used by the eWeLink app)
     """
-    DEFAULT_PORT = 8081
-    DEFAULT_TIMEOUT = 5
-    DEFAULT_PING_INTERVAL = 5
 
     """
     Initialise class with connection parameters
 
-    :param str host: host name or ip address of the device
-    :param int port: port on the device (default: 8081)
+    :param str host: host name (ip address is not supported) as hostname is the mDS servie name
     :return:
     """
 
+    DEFAULT_TIMEOUT = 5
+    DEFAULT_PING_INTERVAL = 5
+    SERVICE_TYPE = "_ewelink._tcp.local."
+
+    zeroconf = Zeroconf()
+
     def __init__(self, host: str,
                  event_handler: Callable[[str], Awaitable[None]],
-                 port: int = DEFAULT_PORT,
                  ping_interval: int = DEFAULT_PING_INTERVAL,
                  timeout: int = DEFAULT_TIMEOUT,
-                 logger: logging.Logger = None):
+                 logger: logging.Logger = None,
+                 loop = None,
+                 device_id: str = "",
+                 api_key: str = ""):
+
         self.host = host
-        self.port = port
-        self.ping_interval = ping_interval
-        self.timeout = timeout
+        self.device_id = device_id
+        self.api_key = api_key
         self.logger = logger
-        self.websocket = None
         self.event_handler = event_handler
         self.connected_event = asyncio.Event()
         self.disconnected_event = asyncio.Event()
-
+        self.service_browser = None
+        self.loop = loop
+        self.http_session = None
+        self.my_service_name = None
+        self.last_request = None
 
         if self.logger is None:
             self.logger = logging.getLogger(__name__)
 
-    async def connect(self):
+    def connect(self):
         """
-        Connect to the Sonoff LAN Mode Device and set up communication channel.
+        Setup a mDNS listener
         """
-        websocket_address = 'ws://%s:%s/' % (self.host, self.port)
-        self.logger.debug('Connecting to websocket address: %s',
-                          websocket_address)
 
-        try:
-            if float(websockets.__version__) >= 7.0:
-                self.websocket = await websockets.connect(
-                    websocket_address,
-                    ping_interval=self.ping_interval,
-                    ping_timeout=self.timeout,
-                    subprotocols=['chat'],
-                    klass=SonoffLANModeClientProtocol
-                )
-            else:
-                self.websocket = await websockets.connect(
-                    websocket_address,
-                    timeout=self.timeout,
-                    subprotocols=['chat'],
-                    klass=SonoffLANModeClientProtocol
-                )
-        except websockets.InvalidMessage as ex:
-            self.logger.error('SonoffLANModeClient connection failed: %s' % ex)
-            raise ex
+        # listen for any added SOnOff
+        self.service_browser = ServiceBrowser(SonoffLANModeClient.zeroconf, SonoffLANModeClient.SERVICE_TYPE, listener=self)
 
-    async def close_connection(self):
-        self.logger.debug('Closing websocket from client close_connection')
-        self.connected_event.clear()
+    def close_connection(self):
+
+        self.logger.debug("enter close_connection()")
+        self.service_browser = None
         self.disconnected_event.set()
-        if self.websocket is not None:
-            self.logger.debug('calling websocket.close')
-            await self.websocket.close()
-            self.websocket = None                       # Ensure we cannot close multiple times
-            self.logger.debug('websocket was closed')
+        self.my_service_name = None
+
+    def remove_service(self, zeroconf, type, name):
+
+        if self.my_service_name == name:
+
+            # hack! send a wake-up message to the switch to see if its still there
+            if self.send_signal_strength(self.get_update_payload(self.device_id, None)) != 0:
+                self.logger.warn("Service %s removed" % name)
+                self.close_connection()
             
-    async def receive_message_loop(self):
-        try:
-            while True:
-                self.logger.debug('Waiting for messages on websocket')
-                message = await self.websocket.recv()
-                await self.event_handler(message)
-                self.logger.debug('Message passed to handler, should loop now')
-        finally:
-            self.logger.debug('receive_message_loop finally block reached')
+            self.logger.debug("Service %s removed (but hack worked)" % name)
 
-    async def send_online_message(self):
-        self.logger.debug('Sending user online message over websocket')
+        #else:
+        #    self.logger.debug("Service %s removed (not our switch)" % name)
 
-        json_data = json.dumps(self.get_user_online_payload())
-        await self.websocket.send(json_data)
+    def add_service(self, zeroconf, type, name):
 
-        response_message = await self.websocket.recv()
-        response = json.loads(response_message)
+        if self.my_service_name is not None:
+        
+            if self.my_service_name == name:
+                self.logger.debug("Service %s added (again, likely after hack)" % name)
+                self.my_service_name = None
 
-        self.logger.debug('Received user online response:')
-        self.logger.debug(response)
-        # Example user online response:
-        # {
-        #     "error": 0,
-        #     "apikey": "ab22d7b3-53de-44b9-ad26-f1ff260e8f1d",
-        #     "sequence": "15483706231915703",
-        #     "deviceid": "100040e943"
-        # }
+            #else:
+            #    self.logger.debug("Service %s added (not our switch)" % name)
 
-        # We want to pass the event to the event_handler already
-        # because the hello event could arrive before the user online
-        # confirmation response
-        await self.event_handler(response_message)
+        if self.my_service_name is None:
+        
+            info = zeroconf.get_service_info(type, name)
+            found_ip = self.parseAddress(info.address)
 
-        if (
-            ('error' in response and response['error'] == 0)
-            and 'deviceid' in response
-        ):
-            self.logger.debug(
-                'Websocket connected and accepted online user OK')
-            return True
+            if self.device_id is not None:
+
+                if name == "eWeLink_" + self.device_id + "." + SonoffLANModeClient.SERVICE_TYPE:
+                    self.my_service_name = name
+
+            elif self.host is not None:
+
+                try:
+
+                    if socket.gethostbyname(self.host) == found_ip:
+                        self.my_service_name = name
+
+                except TypeError:
+
+                    if self.host == found_ip:
+                        self.my_service_name = name
+
+            if self.my_service_name is not None:
+
+                self.logger.info("Service type %s of name %s added", type, name) 
+
+                # listen for updates to the specific device
+                self.service_browser = ServiceBrowser(zeroconf, name, listener=self)
+
+                # create an http session so we can use http keep-alives
+                self.http_session = requests.Session()
+
+                # add the http headers
+                headers = { 'Content-Type': 'application/json;charset=UTF-8',
+                    'Accept': 'application/json',
+                    'Accept-Language': 'en-gb'        
+                }    
+                self.http_session.headers.update(headers)
+
+                # find socket for end-point
+                socket_text = found_ip + ":" + str(info.port)          
+                self.logger.debug("service is at %s", socket_text)
+                self.url = 'http://' + socket_text
+
+                # setup retries (https://urllib3.readthedocs.io/en/latest/reference/urllib3.util.html#urllib3.util.retry.Retry)
+                from requests.adapters import HTTPAdapter
+                from urllib3.util.retry import Retry
+
+                # no retries at moment using requests class, control in sonoffdevice (review after seeing what failure we get)
+                retries = Retry(total=0, backoff_factor=0.5, method_whitelist=['POST'], status_forcelist=None)
+                self.http_session.mount('http://', HTTPAdapter(max_retries=retries))
+
+                # process the initial message
+                self.update_service(zeroconf, type, name)
+
+
+    def update_service(self, zeroconf, type, name):
+
+        info = zeroconf.get_service_info(type, name)
+        self.logger.debug("properties: %s",info.properties)
+
+        if info.properties.get(b'encrypt'):
+            # decrypt the message
+            iv = info.properties.get(b'iv')
+            data1 = info.properties.get(b'data1')
+            plaintext = self.decrypt(data1,iv)
+            data = plaintext
+            self.logger.debug("decrypted data: %s", plaintext)
+
         else:
-            self.logger.error('Websocket connection online user failed')
+            data = info.properties.get(b'data1')
 
-    async def send(self, request: Union[str, Dict]):
+        self.properties = info.properties
+
+        # process the events on an event loop (this method is on a background thread called from zeroconf)
+        asyncio.run_coroutine_threadsafe(self.event_handler(data), self.loop)
+
+
+    def send_switch(self, request: Union[str, Dict]):
+
+        try:
+            return self.send(request, self.url + '/zeroconf/switch')
+
+        except Exception as ex:
+            self.logger.error('Unexpected error in send_switch(): %s %s', format(ex), traceback.format_exc)
+            return 1
+
+
+    def send_signal_strength(self, request: Union[str, Dict]):
+
+        try:
+            return self.send(request, self.url + '/zeroconf/signal_strength')
+
+        except Exception as ex:
+            self.logger.error('Unexpected error in send_signal_strength(): %s %s', format(ex), traceback.format_exc)
+            return 1
+
+
+    def send(self, request: Union[str, Dict], url):
         """
         Send message to an already-connected Sonoff LAN Mode Device
         and return the response.
-
         :param request: command to send to the device (can be dict or json)
         :return:
         """
-        if isinstance(request, dict):
-            request = json.dumps(request)
 
-        self.logger.debug('Sending websocket message: %s', request)
-        await self.websocket.send(request)
+        self.logger.debug('Sending http message to %s: %s ', url, request)      
+        response = self.http_session.post(url, json=request)
+        self.logger.debug('response received: %s %s', response, response.content) 
 
-    @staticmethod
-    def get_user_online_payload() -> Dict:
-        return {
-            'action': "userOnline",
-            'userAgent': 'app',
-            'version': 6,
-            'nonce': ''.join([str(random.randint(0, 9)) for _ in range(15)]),
-            'apkVesrion': "1.8",
-            'os': 'ios',
-            'at': 'at',  # No bearer token needed in LAN mode
-            'apikey': 'apikey',  # No apikey needed in LAN mode
-            'ts': str(int(time.time())),
-            'model': 'iPhone10,6',
-            'romVersion': '11.1.2',
-            'sequence': str(time.time()).replace('.', '')
-        }
+        response_json = json.loads(response.content)
 
-    @staticmethod
-    def get_update_payload(device_id: str, params: dict) -> Dict:
-        return {
-            'action': 'update',
-            'userAgent': 'app',
-            'params': params,
-            'apikey': 'apikey',  # No apikey needed in LAN mode
+        error = response_json['error']
+
+        if error != 0:
+            self.logger.warn('error received: %s', response.content)
+            # no need to process error, retry will resend message which should be sufficient
+
+        else:
+            self.logger.debug('message sent to switch successfully') 
+            # no need to do anything here, the update is processed via the mDNS TXT record update
+
+        return error
+
+
+    def get_update_payload(self, device_id: str, params: dict) -> Dict:
+
+        payload = {
+            'sequence': str(int(time.time())), # ensure this field isn't too long, otherwise buffer overflow type issue caused in the device
             'deviceid': device_id,
-            'sequence': str(time.time()).replace('.', ''),
-            'controlType': 4,
-            'ts': 0
+            'selfApikey': '123',  # This field need to exist, but no idea what it is used for (https://github.com/itead/Sonoff_Devices_DIY_Tools/issues/5)
+            'data': json.dumps(params)
         }
+
+        self.logger.debug('message to send (plaintext): %s', payload)
+
+        if self.api_key != "":
+            self.format_encryption(payload)
+            self.logger.debug('encrypted: %s', payload)
+
+        return payload
+
+    def format_encryption(self, data):
+
+        encrypt = True
+        data["encrypt"] = encrypt
+        if encrypt:
+            iv = self.generate_iv()
+            data["iv"] = b64encode(iv).decode("utf-8") 
+            data["data"] = self.encrypt(data["data"], iv)
+
+    def encrypt(self, data_element, iv):
+
+        ApiKey = bytes(self.api_key, 'utf-8') 
+        plaintext = bytes(data_element, 'utf-8')
+
+        h = MD5.new()
+        h.update(ApiKey)
+        key = h.digest()
+
+        cipher = AES.new(key, AES.MODE_CBC, iv=iv)     
+        padded = pad(plaintext, AES.block_size)
+        ciphertext = cipher.encrypt(padded)
+        encode = b64encode(ciphertext) 
+
+        return encode.decode("utf-8")
+
+    def generate_iv(self):
+        return get_random_bytes(16)
+
+    def decrypt(self, data_element, iv):
+
+        ApiKey = bytes(self.api_key, 'utf-8')
+        encoded =  data_element
+
+        h = MD5.new()
+        h.update(ApiKey)
+        key = h.digest()
+
+        cipher = AES.new(key, AES.MODE_CBC, iv=b64decode(iv))
+        ciphertext = b64decode(encoded)        
+        padded = cipher.decrypt(ciphertext)
+        plaintext = unpad(padded, AES.block_size)
+
+        return plaintext
+
+    def parseAddress(self, address):
+        """
+        Resolve the IP address of the device
+        :param address:
+        :return: add_str
+        """
+        add_list = []
+        for i in range(4):
+            add_list.append(int(address.hex()[(i * 2):(i + 1) * 2], 16))
+        add_str = str(add_list[0]) + "." + str(add_list[1]) + \
+            "." + str(add_list[2]) + "." + str(add_list[3])
+        return add_str
