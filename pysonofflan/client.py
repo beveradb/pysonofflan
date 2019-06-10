@@ -197,7 +197,7 @@ class SonoffLANModeClient:
             return self.send(request, self.url + '/zeroconf/signal_strength')
 
         except Exception as ex:
-            self.logger.error('Unexpected error in send_switch(): %s %s', format(ex), traceback.format_exc)
+            self.logger.error('Unexpected error in send_signal_strength(): %s %s', format(ex), traceback.format_exc)
             return 1
 
 
