@@ -63,6 +63,7 @@ class SonoffLANModeClient:
         if self.logger is None:
             self.logger = logging.getLogger(__name__)
 
+
     def connect(self):
         """
         Setup a mDNS listener
@@ -71,6 +72,7 @@ class SonoffLANModeClient:
         # listen for any added SOnOff
         self.service_browser = ServiceBrowser(SonoffLANModeClient.zeroconf, SonoffLANModeClient.SERVICE_TYPE, listener=self)
 
+
     def close_connection(self):
 
         self.logger.debug("enter close_connection()")
@@ -78,19 +80,23 @@ class SonoffLANModeClient:
         self.disconnected_event.set()
         self.my_service_name = None
 
+
     def remove_service(self, zeroconf, type, name):
 
         if self.my_service_name == name:
 
-            # hack! send a wake-up message to the switch to see if its still there
-            if self.send_signal_strength(self.get_update_payload(self.device_id, None)) != 0:
-                self.logger.warn("Service %s removed" % name)
+            try:
+                # hack! send a wake-up message to the switch to see if its still there
+                self.send_signal_strength(self.get_update_payload(self.device_id, None))
+                self.logger.debug("Service %s removed (but hack worked)" % name)
+
+            except OSError:
+                self.logger.info("Service %s removed" % name)
                 self.close_connection()
-            
-            self.logger.debug("Service %s removed (but hack worked)" % name)
 
         #else:
         #    self.logger.debug("Service %s removed (not our switch)" % name)
+
 
     def add_service(self, zeroconf, type, name):
 
@@ -183,22 +189,12 @@ class SonoffLANModeClient:
 
     def send_switch(self, request: Union[str, Dict]):
 
-        try:
-            return self.send(request, self.url + '/zeroconf/switch')
-
-        except Exception as ex:
-            self.logger.error('Unexpected error in send_switch(): %s %s', format(ex), traceback.format_exc)
-            return 1
+        return self.send(request, self.url + '/zeroconf/switch')
 
 
     def send_signal_strength(self, request: Union[str, Dict]):
 
-        try:
-            return self.send(request, self.url + '/zeroconf/signal_strength')
-
-        except Exception as ex:
-            self.logger.error('Unexpected error in send_signal_strength(): %s %s', format(ex), traceback.format_exc)
-            return 1
+        return self.send(request, self.url + '/zeroconf/signal_strength')
 
 
     def send(self, request: Union[str, Dict], url):
@@ -208,7 +204,6 @@ class SonoffLANModeClient:
         :param request: command to send to the device (can be dict or json)
         :return:
         """
-
         self.logger.debug('Sending http message to %s: %s ', url, request)      
         response = self.http_session.post(url, json=request)
         self.logger.debug('response received: %s %s', response, response.content) 
@@ -224,8 +219,6 @@ class SonoffLANModeClient:
         else:
             self.logger.debug('message sent to switch successfully') 
             # no need to do anything here, the update is processed via the mDNS TXT record update
-
-        return error
 
 
     def get_update_payload(self, device_id: str, params: dict) -> Dict:
@@ -245,6 +238,7 @@ class SonoffLANModeClient:
 
         return payload
 
+
     def format_encryption(self, data):
 
         encrypt = True
@@ -253,6 +247,7 @@ class SonoffLANModeClient:
             iv = self.generate_iv()
             data["iv"] = b64encode(iv).decode("utf-8") 
             data["data"] = self.encrypt(data["data"], iv)
+
 
     def encrypt(self, data_element, iv):
 
@@ -270,8 +265,10 @@ class SonoffLANModeClient:
 
         return encode.decode("utf-8")
 
+
     def generate_iv(self):
         return get_random_bytes(16)
+
 
     def decrypt(self, data_element, iv):
 
@@ -288,6 +285,7 @@ class SonoffLANModeClient:
         plaintext = unpad(padded, AES.block_size)
 
         return plaintext
+
 
     def parseAddress(self, address):
         """

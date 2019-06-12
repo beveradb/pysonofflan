@@ -177,27 +177,31 @@ class SonoffDevice(object):
                             'event cleared, should loop now')
                         retry_count = 0
                     else:
-                        self.logger.warn(
-                            "we didn't get a confirmed acknowledgement,"
+                        self.logger.info(
+                            "we didn't get a confirmed acknowledgement, "
                             "state has changed in between retry!")
                         retry_count += 1
                     
                 except asyncio.TimeoutError:
                     self.logger.warn(
-                        'Update message not received in timeout period, retry')
-                    retry_count += 1
-
-                except OSError as ex:
-                    self.logger.warn('OSError in send(): %s', format(ex))
-                    await asyncio.sleep(self.calculate_retry(retry_count))
+                        'Device: %s. Update message not received in timeout period, retry', self.device_id)
                     retry_count += 1
 
                 except asyncio.CancelledError:
                     self.logger.debug('send_updated_params_loop cancelled')
                     break
 
+                except OSError as ex:
+                    if retry_count == 0:
+                        self.logger.warn('Connection issue for device %s: %s', self.device_id, format(ex))
+                    else:
+                        self.logger.debug('Connection issue for device %s: %s', self.device_id, format(ex))
+
+                    await asyncio.sleep(self.calculate_retry(retry_count))
+                    retry_count += 1
+
                 except Exception as ex:
-                    self.logger.error('Unexpected error in send_updated_params_loop: %s %s', format(ex), traceback.format_exc)
+                    self.logger.error('Unexpected error for device %s: %s %s', self.device_id, format(ex), traceback.format_exc)
                     break
 
         except asyncio.CancelledError:
@@ -218,7 +222,7 @@ class SonoffDevice(object):
             self.params = params
             self.params_updated_event.set()
         else:
-            self.logger.debug('unecessary update received, ignoring')
+            self.logger.debug('unnecessary update received, ignoring')
 
     async def handle_message(self, message):
         """
@@ -254,7 +258,7 @@ class SonoffDevice(object):
                         response['switch'])
 
                 else:                   
-                    self.logger.warn(
+                    self.logger.info(
                         'failed update! state is: %s, expecting: %s',
                         response['switch'], self.params['switch'])
 
@@ -341,7 +345,7 @@ class SonoffDevice(object):
         :return: Device ID.
         :rtype: str
         """
-        return self.client.properties[b'id']
+        return self.client.properties[b'id'].decode("utf-8")
 
     async def turn_off(self) -> None:
         """
