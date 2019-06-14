@@ -23,6 +23,8 @@ import socket
 class SonoffLANModeClient:
     """
     Implementation of the Sonoff LAN Mode Protocol R3(as used by the eWeLink app)
+    
+    Uses protocol as documented here by Itead https://github.com/itead/Sonoff_Devices_DIY_Tools/blob/master/other/SONOFF%20DIY%20MODE%20Protocol%20Doc.pdf
     """
 
     """
@@ -87,6 +89,13 @@ class SonoffLANModeClient:
 
             try:
                 # hack! send a wake-up message to the switch to see if its still there
+                # in testing on certain platforms (RPi) I found that the remove_service was called unexpectely when the device was available
+                # this didn't occur on other platforms (Hassio VM).
+                # I found that sending a HTTP REST message resulted in the device readding itself back on (via add_service) immediately
+                # rather than waiting for it to occur 'naturally'
+                # It could be that my Rpi is not picking up all broadcast messages and so the mDNS cache is expiring, but this has not been 
+                # investigated in detail. I would value feedback from other users to see if this 'hack' is called for their setup
+                
                 self.send_signal_strength(self.get_update_payload(self.device_id, None))
                 self.logger.debug("Service %s removed (but hack worked)" % name)
 
@@ -238,6 +247,25 @@ class SonoffLANModeClient:
 
         return payload
 
+        
+    """ Encrpytion routines as documented in https://github.com/itead/Sonoff_Devices_DIY_Tools/blob/master/other/SONOFF%20DIY%20MODE%20Protocol%20Doc.pdf
+    
+    Here are an abstract of the document with the partinent parts for the alogrithm
+    
+        The default password must be the API Key of the device. 
+        
+        The key used for encryption is the MD5 hash of the device password (16 bytes)
+        
+        The initialization vector iv used for encryption is a 16-byte random number, Base64 encoded as a string
+        
+        The encryption algorithm must be "AES-128-CBC/PKCS7Padding" (AES 128 Cipher Block Chaining (CBC) with PKCS7 Padding)
+        
+        When the device information (unencrypted or encrypted string) is longer than 249 bytes, the first 249 bytes must be stored in data1, and the remaining bytes are divided by length 249, which are stored in data2, data3, and data4.
+        
+        [This last part is currently unimplemented as I haven't seen a mesage longer than 249 bytes as yet, proably will have on multi-channel devices]
+        
+        
+    """
 
     def format_encryption(self, data):
 
@@ -251,19 +279,19 @@ class SonoffLANModeClient:
 
     def encrypt(self, data_element, iv):
 
-        ApiKey = bytes(self.api_key, 'utf-8') 
+        api_key = bytes(self.api_key, 'utf-8') 
         plaintext = bytes(data_element, 'utf-8')
 
-        h = MD5.new()
-        h.update(ApiKey)
-        key = h.digest()
+        hash = MD5.new()
+        hash.update(api_key)
+        key = hash.digest()
 
         cipher = AES.new(key, AES.MODE_CBC, iv=iv)     
         padded = pad(plaintext, AES.block_size)
         ciphertext = cipher.encrypt(padded)
-        encode = b64encode(ciphertext) 
+        encoded = b64encode(ciphertext) 
 
-        return encode.decode("utf-8")
+        return encoded.decode("utf-8")
 
 
     def generate_iv(self):
@@ -272,12 +300,12 @@ class SonoffLANModeClient:
 
     def decrypt(self, data_element, iv):
 
-        ApiKey = bytes(self.api_key, 'utf-8')
+        api_key = bytes(self.api_key, 'utf-8')
         encoded =  data_element
 
-        h = MD5.new()
-        h.update(ApiKey)
-        key = h.digest()
+        hash = MD5.new()
+        hash.update(ApiKey)
+        key = hash.digest()
 
         cipher = AES.new(key, AES.MODE_CBC, iv=b64decode(iv))
         ciphertext = b64decode(encoded)        

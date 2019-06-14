@@ -90,14 +90,12 @@ class SonoffDevice(object):
         try:
 
             # increasing backoff each retry attempt
-            wait_times = [2, 5, 10, 30, 60]
+            wait_seconds = [2, 5, 10, 30, 60]
 
-            if retry_count >= len(wait_times):
-                retry_count = len(wait_times) - 1
+            if retry_count >= len(wait_seconds):
+                retry_count = len(wait_seconds) - 1
 
-            wait_time = wait_times[retry_count]
-
-            return wait_time
+            return wait_seconds[retry_count]
 
         except Exception as ex:
             self.logger.error('Unexpected error in wait_before_retry(): %s',
