@@ -241,7 +241,7 @@ class SonoffLANModeClient:
 
         self.logger.debug('message to send (plaintext): %s', payload)
 
-        if self.api_key != "":
+        if self.api_key != "" and self.api_key is not None:
             self.format_encryption(payload)
             self.logger.debug('encrypted: %s', payload)
 
@@ -304,7 +304,7 @@ class SonoffLANModeClient:
         encoded =  data_element
 
         hash = MD5.new()
-        hash.update(ApiKey)
+        hash.update(api_key)
         key = hash.digest()
 
         cipher = AES.new(key, AES.MODE_CBC, iv=b64decode(iv))

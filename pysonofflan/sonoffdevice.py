@@ -206,7 +206,7 @@ class SonoffDevice(object):
             self.logger.debug('send_updated_params_loop cancelled')
 
         except Exception as ex:
-            self.logger.error('Unexpected error in send_updated_params_loop: %s', format(ex))
+            self.logger.error('Unexpected error for device %s: %s %s', self.device_id, format(ex), traceback.format_exc)
 
         finally:
             self.logger.debug('send_updated_params_loop finally block reached')
