@@ -61,6 +61,7 @@ class SonoffLANModeClient:
         self.http_session = None
         self.my_service_name = None
         self.last_request = None
+        self.encrypted = False
 
         if self.logger is None:
             self.logger = logging.getLogger(__name__)
@@ -186,9 +187,11 @@ class SonoffLANModeClient:
             plaintext = self.decrypt(data1,iv)
             data = plaintext
             self.logger.debug("decrypted data: %s", plaintext)
+            self.encrypted = True
 
         else:
             data = info.properties.get(b'data1')
+            self.encrypted = False
 
         self.properties = info.properties
 
@@ -235,15 +238,22 @@ class SonoffLANModeClient:
         payload = {
             'sequence': str(int(time.time())), # ensure this field isn't too long, otherwise buffer overflow type issue caused in the device
             'deviceid': device_id,
-            'selfApikey': '123',  # This field need to exist, but no idea what it is used for (https://github.com/itead/Sonoff_Devices_DIY_Tools/issues/5)
+            'selfApikey': '123',  # This field needs to exist, but no idea what it is used for (https://github.com/itead/Sonoff_Devices_DIY_Tools/issues/5)
             'data': json.dumps(params)
         }
 
         self.logger.debug('message to send (plaintext): %s', payload)
 
-        if self.api_key != "" and self.api_key is not None:
-            self.format_encryption(payload)
-            self.logger.debug('encrypted: %s', payload)
+        if self.encrypted:
+
+            if self.api_key != "" and self.api_key is not None:
+                self.format_encryption(payload)
+                self.logger.debug('encrypted: %s', payload)
+            else:
+                self.logger.error('missing api_key field for device: %s', self.device_id) 
+
+        else:
+            payload["encrypt"] = False
 
         return payload
 
