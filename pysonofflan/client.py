@@ -310,17 +310,22 @@ class SonoffLANModeClient:
 
     def decrypt(self, data_element, iv):
 
-        api_key = bytes(self.api_key, 'utf-8')
-        encoded =  data_element
+        try:
 
-        hash = MD5.new()
-        hash.update(api_key)
-        key = hash.digest()
+            api_key = bytes(self.api_key, 'utf-8')
+            encoded =  data_element
 
-        cipher = AES.new(key, AES.MODE_CBC, iv=b64decode(iv))
-        ciphertext = b64decode(encoded)        
-        padded = cipher.decrypt(ciphertext)
-        plaintext = unpad(padded, AES.block_size)
+            hash = MD5.new()
+            hash.update(api_key)
+            key = hash.digest()
+
+            cipher = AES.new(key, AES.MODE_CBC, iv=b64decode(iv))
+            ciphertext = b64decode(encoded)        
+            padded = cipher.decrypt(ciphertext)
+            plaintext = unpad(padded, AES.block_size)
+
+        except Exception as ex:
+            self.logger.error('Error decrypting for device %s: %s, probably wrong API key', self.device_id, format(ex)) 
 
         return plaintext
 
