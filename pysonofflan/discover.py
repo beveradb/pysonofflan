@@ -8,6 +8,7 @@ from typing import Dict, Optional
 
 class Discover:
     SONOFF_PORT = 8081
+    MAX_THREADS = 128
 
     @staticmethod
     async def discover(logger=None, network: Optional[str]=None) -> Dict[str, str]:
@@ -24,7 +25,6 @@ class Discover:
 
         logger.debug("Attempting connection to all IPs on local network.")
         devices = {}
-        threads = []
 
         networks = [ipaddress.IPv4Network(network)] if network else [
             ipaddress.IPv4Network('127.0.0.1/32'),
@@ -33,21 +33,29 @@ class Discover:
         ]
 
         try:
-            local_ip_ranges = chain(*networks)
+            local_ip_ranges = tuple(chain(*networks))
 
-            # Spawn thread per IP address to scan
-            for ip in local_ip_ranges:
-                t = threading.Thread(target=Discover.probe_ip,
-                                     args=(logger, ip, devices))
-                threads.append(t)
+            i = 0
+            count = len(local_ip_ranges)
+            max_threads = Discover.MAX_THREADS
+            while i < count:
+                threads = []
+                while i < count and len(threads) < max_threads:
+                    ip = local_ip_ranges[i]
+                    i += 1
+                    t = threading.Thread(target=Discover.probe_ip,
+                                         args=(logger, ip, devices))
+                    threads.append(t)
 
-            # Start all threads
-            for thread in threads:
-                thread.start()
+                logger.debug("Starting %s threads (IPs %s of %s)",
+                             len(threads), i, count)
+                # Start all threads
+                for thread in threads:
+                    thread.start()
 
-            # Lock the main thread until all threads complete
-            for thread in threads:
-                thread.join()
+                # Lock the main thread until all threads complete
+                for thread in threads:
+                    thread.join()
 
         except Exception as ex:
             logger.error("Caught Exception: %s" % ex, exc_info=False)
