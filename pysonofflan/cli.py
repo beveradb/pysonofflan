@@ -76,14 +76,15 @@ def cli(ctx, host, device_id, api_key, inching):
     ctx.obj = {"host": host, "device_id": device_id, "api_key": api_key, "inching": inching}
 
 @cli.command()
-def discover():
+@click.option('--network', default=None, help='Network address to scan, ex: 192.168.0.0/24')
+def discover(network):
     """Discover devices in the network (takes ~1 minute)."""
     logger.info(
         "Attempting to discover Sonoff LAN Mode devices "
         "on the local network, please wait..."
     )
     found_devices = asyncio.get_event_loop().run_until_complete(
-        Discover.discover(logger)).items()
+        Discover.discover(logger, network)).items()
     for ip, found_device_id in found_devices:
         logger.info("Found Sonoff LAN Mode device at IP %s" % ip)
 
