@@ -3,14 +3,14 @@ import logging
 import socket
 import threading
 from itertools import chain
-from typing import Dict
+from typing import Dict, Optional
 
 
 class Discover:
     SONOFF_PORT = 8081
 
     @staticmethod
-    async def discover(logger=None) -> Dict[str, str]:
+    async def discover(logger=None, network: Optional[str]=None) -> Dict[str, str]:
         """
         Attempts websocket connection on port 8081 to all IP addresses on
         common home IP subnets: 192.168.0.X and 192.168.1.X, in the hope of
@@ -26,12 +26,14 @@ class Discover:
         devices = {}
         threads = []
 
+        networks = [ipaddress.IPv4Network(network)] if network else [
+            ipaddress.IPv4Network('127.0.0.1/32'),
+            ipaddress.IPv4Network('192.168.0.0/24'),
+            ipaddress.IPv4Network('192.168.1.0/24')
+        ]
+
         try:
-            local_ip_ranges = chain(
-                ipaddress.IPv4Network('127.0.0.1/32'),
-                ipaddress.IPv4Network('192.168.0.0/24'),
-                ipaddress.IPv4Network('192.168.1.0/24')
-            )
+            local_ip_ranges = chain(*networks)
 
             # Spawn thread per IP address to scan
             for ip in local_ip_ranges:
