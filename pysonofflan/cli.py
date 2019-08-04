@@ -115,13 +115,13 @@ def state(config: dict):
 @pass_config
 def on(config: dict):
     """Turn the device on."""
-    switch_device(config['host'], config['inching'], 'on')
+    switch_device(config, 'on')
 
 @cli.command()
 @pass_config
 def off(config: dict):
     """Turn the device off."""
-    switch_device(config['host'], config['inching'], 'off')
+    switch_device(config, 'off')
 
 
 @cli.command()
@@ -167,7 +167,9 @@ def print_device_details(device):
                     )
 
 
-def switch_device(host, inching, new_state):
+def switch_device(config, new_state):
+    host = config['host']
+    inching = config['inching']
     logger.info("Initialising SonoffSwitch with host %s" % host)
 
     async def update_callback(device: SonoffSwitch):
