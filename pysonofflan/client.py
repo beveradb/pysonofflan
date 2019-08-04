@@ -251,7 +251,7 @@ class SonoffLANModeClient:
             'sequence': str(int(time.time())), # ensure this field isn't too long, otherwise buffer overflow type issue caused in the device
             'deviceid': device_id,
             'selfApikey': '123',  # This field needs to exist, but no idea what it is used for (https://github.com/itead/Sonoff_Devices_DIY_Tools/issues/5)
-            'data': json.dumps(params)
+            'data': params
         }
 
         self.logger.debug('message to send (plaintext): %s', payload)
@@ -296,7 +296,7 @@ class SonoffLANModeClient:
         if encrypt:
             iv = self.generate_iv()
             data["iv"] = b64encode(iv).decode("utf-8") 
-            data["data"] = self.encrypt(data["data"], iv)
+            data["data"] = self.encrypt(json.dumps(data["data"]), iv)
 
 
     def encrypt(self, data_element, iv):
