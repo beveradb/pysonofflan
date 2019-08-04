@@ -184,6 +184,18 @@ class SonoffLANModeClient:
             # decrypt the message
             iv = info.properties.get(b'iv')
             data1 = info.properties.get(b'data1')
+            if len(data1) == 249:
+                data2 = info.properties.get(b'data2')
+                data1 += data2
+
+                if len(data2) == 249:
+                    data3 = info.properties.get(b'data3')
+                    data1 += data3
+
+                    if len(data3) == 249:
+                        data4 = info.properties.get(b'data4')
+                        data1 += data4
+
             plaintext = self.decrypt(data1,iv)
             data = plaintext
             self.logger.debug("decrypted data: %s", plaintext)
@@ -225,7 +237,7 @@ class SonoffLANModeClient:
         error = response_json['error']
 
         if error != 0:
-            self.logger.warn('error received: %s', response.content)
+            self.logger.warn('error received: %s, %s', self.device_id, response.content)
             # no need to process error, retry will resend message which should be sufficient
 
         else:
