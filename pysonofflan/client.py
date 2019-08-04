@@ -335,11 +335,11 @@ class SonoffLANModeClient:
             ciphertext = b64decode(encoded)        
             padded = cipher.decrypt(ciphertext)
             plaintext = unpad(padded, AES.block_size)
+            return plaintext
 
         except Exception as ex:
             self.logger.error('Error decrypting for device %s: %s, probably wrong API key', self.device_id, format(ex)) 
 
-        return plaintext
 
 
     def parseAddress(self, address):
