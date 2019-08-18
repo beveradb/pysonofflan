@@ -296,7 +296,12 @@ class SonoffLANModeClient:
         if encrypt:
             iv = self.generate_iv()
             data["iv"] = b64encode(iv).decode("utf-8") 
-            data["data"] = self.encrypt(json.dumps(data["data"]), iv)
+
+            if data["data"] is None:
+                # data["data"] = self.encrypt("{ }", iv)
+                data["data"] = ""
+            else:
+                data["data"] = self.encrypt(json.dumps(data["data"]), iv)
 
 
     def encrypt(self, data_element, iv):
