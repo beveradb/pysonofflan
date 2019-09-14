@@ -76,14 +76,15 @@ def cli(ctx, host, device_id, api_key, inching):
     ctx.obj = {"host": host, "device_id": device_id, "api_key": api_key, "inching": inching}
 
 @cli.command()
-def discover():
+@click.option('--network', default=None, help='Network address to scan, ex: 192.168.0.0/24')
+def discover(network):
     """Discover devices in the network (takes ~1 minute)."""
     logger.info(
         "Attempting to discover Sonoff LAN Mode devices "
         "on the local network, please wait..."
     )
     found_devices = asyncio.get_event_loop().run_until_complete(
-        Discover.discover(logger)).items()
+        Discover.discover(logger, network)).items()
     for ip, found_device_id in found_devices:
         logger.info("Found Sonoff LAN Mode device at IP %s" % ip)
 
@@ -115,13 +116,13 @@ def state(config: dict):
 @pass_config
 def on(config: dict):
     """Turn the device on."""
-    switch_device(config['host'], config['inching'], 'on')
+    switch_device(config, 'on')
 
 @cli.command()
 @pass_config
 def off(config: dict):
     """Turn the device off."""
-    switch_device(config['host'], config['inching'], 'off')
+    switch_device(config, 'off')
 
 
 @cli.command()
@@ -167,7 +168,9 @@ def print_device_details(device):
                     )
 
 
-def switch_device(host, inching, new_state):
+def switch_device(config, new_state):
+    host = config['host']
+    inching = config['inching']
     logger.info("Initialising SonoffSwitch with host %s" % host)
 
     async def update_callback(device: SonoffSwitch):
