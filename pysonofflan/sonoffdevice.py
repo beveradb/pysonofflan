@@ -9,7 +9,7 @@ from typing import Callable, Awaitable, Dict
 
 import traceback
 
-from .client import SonoffLANModeClient
+from client import SonoffLANModeClient
 
 
 class SonoffDevice(object):
@@ -234,52 +234,62 @@ class SonoffDevice(object):
 
         response = json.loads(message)
 
-        if ('switch' in response):
-            self.logger.debug(
-                'Message: Received status from device, storing in instance')
-            self.basic_info = response
-            self.basic_info['deviceid'] = self.host
 
-            self.client.connected_event.set()
+        if self.client.type == b'strip':
 
-            send_update = False
+            switch_status = response['switches'][0]['switch']
 
-            # is there is a new message queued to be sent
-            if self.params_updated_event.is_set():
-                
-                # only send client update message if the change has been successful
-                if self.params['switch'] == response['switch']:
- 
-                    self.message_acknowledged_event.set()
-                    send_update = True
-                    self.logger.debug('expected update received from switch: %s',
-                        response['switch'])
+        elif self.client.type == b'plug' or self.client.type == b'diy_plug':
 
-                else:                   
-                    self.logger.info(
-                        'failed update! state is: %s, expecting: %s',
-                        response['switch'], self.params['switch'])
-
-            else:                                          
-                # this is a status update message originating from the device
-                # only send client update message if the status has changed
-
-                self.logger.info(
-                    'unsolicited update received from switch: %s',
-                    response['switch'])
-
-                if self.params['switch'] != response['switch']:       
-                    self.params = {"switch": response['switch']}
-                    send_update = True
-
-            if send_update and self.callback_after_update is not None:
-                await self.callback_after_update(self)
+            switch_status = response['switch']
 
         else:
             self.logger.error(
                 'Unknown message received from device: ' % message)
             raise Exception('Unknown message received from device')
     
+
+        self.logger.debug(
+            'Message: Received status from device, storing in instance')
+        self.basic_info = response
+        self.basic_info['deviceid'] = self.host
+
+        self.client.connected_event.set()
+
+        send_update = False
+
+        # is there is a new message queued to be sent
+        if self.params_updated_event.is_set():
+            
+            # only send client update message if the change has been successful
+            if self.params['switch'] == switch_status:
+
+                self.message_acknowledged_event.set()
+                send_update = True
+                self.logger.debug('expected update received from switch: %s',
+                    switch_status)
+
+            else:                   
+                self.logger.info(
+                    'failed update! state is: %s, expecting: %s',
+                    switch_status, self.params['switch'])
+
+        else:                                          
+            # this is a status update message originating from the device
+            # only send client update message if the status has changed
+
+            self.logger.info(
+                'unsolicited update received from switch: %s',
+                switch_status)
+
+            if self.params['switch'] != switch_status:       
+                self.params = {"switch": switch_status}
+                send_update = True
+
+        if send_update and self.callback_after_update is not None:
+            await self.callback_after_update(self)
+
+
     
     def shutdown_event_loop(self):
         self.logger.debug('shutdown_event_loop called')

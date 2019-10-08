@@ -62,6 +62,7 @@ class SonoffLANModeClient:
         self.my_service_name = None
         self.last_request = None
         self.encrypted = False
+        self.type = None
 
         if self.logger is None:
             self.logger = logging.getLogger(__name__)
@@ -180,6 +181,9 @@ class SonoffLANModeClient:
         info = zeroconf.get_service_info(type, name)
         self.logger.debug("properties: %s",info.properties)
 
+        self.type = info.properties.get(b'type')
+        self.logger.debug("type: %s", self.type)
+
         if info.properties.get(b'encrypt'):
             # decrypt the message
             iv = info.properties.get(b'iv')
@@ -246,6 +250,13 @@ class SonoffLANModeClient:
 
 
     def get_update_payload(self, device_id: str, params: dict) -> Dict:
+
+        ''' Hack for multi outlet switches, needs improving '''
+
+        if self.type == b'strip':
+            switches = {"switches":[{"outlet":0,"switch":"off"}]}
+            switches["switches"][0]["switch"] = params["switch"]
+            params = switches
 
         payload = {
             'sequence': str(int(time.time())), # ensure this field isn't too long, otherwise buffer overflow type issue caused in the device
@@ -343,6 +354,7 @@ class SonoffLANModeClient:
 
         except Exception as ex:
             self.logger.error('Error decrypting for device %s: %s, probably wrong API key', self.device_id, format(ex)) 
+            raise
 
         return plaintext
 
