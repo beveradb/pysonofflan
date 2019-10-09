@@ -47,45 +47,16 @@ __ https://help.ewelink.cc/hc/en-us/articles/360007134171-LAN-Mode-Tutorial
 
 Since mid 2018, the firmware Itead have shipped with most Sonoff devices
 has provided this feature, allowing devices to be controlled directly
-on the local network using a WebSocket (and now REST) connection on port 8081.
+on the local network using a WebSocket connection on port 8081.
 
-Originally, with firmwares prior to 3.x the feature was designed to only be
-used when there is no connection to the Itead cloud servers, (e.g. if your
-internet connection is down, or their servers are down). As such, it is only
-enabled when the device is connected to your WiFi network, but *unable to
-reach the Itead servers*. Most users would only be able to use this by
-**deliberately blocking internet access** to their Sonoff devices.
+The feature is designed to only be used when there is no connection
+to the Itead cloud servers, (e.g. if your internet connection is down,
+or their servers are down).
+As such, it is only enabled when the device is connected to your WiFi
+network, but *unable to reach the Itead servers*.
 
-This **changed with Firmware 3.x**, where eWeLink prioritize the LAN
-connection over remote, alongside with change to the remote control
-protocol: instead of one single WebSocket with a single connection,
-the device now uses mDNS (ie: Zeroconf) to broadcast status updates
-and uses RESTful ``POST`` with AES/CBC **encrypted** data payload to
-control the device, as document at
-`github/itead/Sonoff_Devices_DIY_Tools <https://github.com/itead/Sonoff_Devices_DIY_Tools/blob/master/other/SONOFF%20DIY%20MODE%20Protocol%20Doc.pdf>`_.
-
-Itead is introducing a DIY mode, which is toggled by a physical jumper
-on newer Basic R3 models (see the PDF above for more details). This will
-disable the encryption and take/report data in plaintext.
-
-If you don't have the DIY mode jumper, then you'll have to follow some
-method to capture it (more details at
-`Sonoff switch complete hack without firmware upgrade <https://blog.ipsumdomus.com/sonoff-switch-complete-hack-without-firmware-upgrade-1b2d6632c01>`_)
-to get the ``apikey``, which should be given to this tool.
-Another option is to use some proxy and intercept communication between
-your mobile phone and the device, such as using
-https://www.charlesproxy.com and looking for your device's IP doing a
-GET request to ``http://{DEVICE_IP}:8081/device``. It should be something
-as:
-
-::
-
-    {
-        "deviceid": "10006866e9",
-        "apikey": "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx",
-        "accept": "post",
-        "chipid": "00FAC110"
-    }
+Most users will only be able to use this by **deliberately
+blocking internet access** to their Sonoff devices.
 
 Features
 --------
@@ -119,7 +90,6 @@ Command-Line Usage
     Options:
       --host TEXT          IP address or hostname of the device to connect to.
       --device_id TEXT     Device ID of the device to connect to.
-      --api_key TEXT       api key for the device to connect to.
       --inching TEXT       Number of seconds of "on" time if this is an
                            Inching/Momentary switch.
       -v, --verbosity LVL  Either CRITICAL, ERROR, WARNING, INFO or DEBUG
@@ -140,14 +110,12 @@ Usage Example
     2019-01-31 00:45:32,074 - info: Attempting to discover Sonoff LAN Mode devices on the local network, please wait...
     2019-01-31 00:46:24,007 - info: Found Sonoff LAN Mode device at IP 192.168.0.77
 
-    $ DEVICE_ID=10006866e9
-    $ API_KEY=xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx
-    $ pysonofflan --device_id $DEVICE_ID --api_key $API_KEY state
+    $ pysonofflan --host 192.168.0.77 state
     2019-01-31 00:41:34,931 - info: Initialising SonoffSwitch with host 192.168.0.77
     2019-01-31 00:41:35,016 - info: == Device: 10006866e9 (192.168.0.77) ==
     2019-01-31 00:41:35,016 - info: State: OFF
 
-    $ pysonofflan --device_id $DEVICE_ID --api_key $API_KEY on
+    $ pysonofflan --host 192.168.0.77 on
     2019-01-31 00:49:40,334 - info: Initialising SonoffSwitch with host 192.168.0.77
     2019-01-31 00:49:40,508 - info:
     2019-01-31 00:49:40,508 - info: Initial state:

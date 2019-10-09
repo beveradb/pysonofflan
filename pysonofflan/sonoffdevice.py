@@ -113,7 +113,12 @@ class SonoffDevice(object):
                 await self.client.connected_event.wait()
                 self.client.disconnected_event.clear()
 
-                self.logger.debug('connected event, waiting for disconnection')
+                self.logger.debug('connected event, sending update')
+
+                if self.callback_after_update is not None:
+                    await self.callback_after_update(self)
+
+                self.logger.debug('waiting for disconnection')
 
                 await self.client.disconnected_event.wait()
                 self.client.connected_event.clear()

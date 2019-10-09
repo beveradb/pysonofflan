@@ -10,5 +10,4 @@ Development Lead
 Contributors
 ------------
 
-* mattsaxon
-* Gustavo Sverzut Barbieri <barbieri@gmail.com>
+None yet. Why not be the first?

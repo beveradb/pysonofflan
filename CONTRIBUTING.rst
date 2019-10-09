@@ -64,11 +64,11 @@ Ready to contribute? Here's how to set up `pysonofflan` for local development.
 
     $ git clone git@github.com:your_name_here/pysonofflan.git
 
-3. Install your local copy into a pipenv (wrapper on top of virtualenv + pip). Assuming you have `pipenv <https://docs.pipenv.org/en/latest/>`_ installed, this is how you set up your fork for local development::
+3. Install your local copy into a virtualenv. Assuming you have virtualenvwrapper installed, this is how you set up your fork for local development::
 
+    $ mkvirtualenv pysonofflan
     $ cd pysonofflan/
-    $ pipenv install --dev
-    $ pipenv shell
+    $ python setup.py develop
 
 4. Create a branch for local development::
 
@@ -83,7 +83,7 @@ Ready to contribute? Here's how to set up `pysonofflan` for local development.
     $ python setup.py test or py.test
     $ tox
 
-   To get flake8 and tox, just ``pipenv install --dev`` them into your pipenv.
+   To get flake8 and tox, just pip install them into your virtualenv.
 
 6. Commit your changes and push your branch to GitHub::
 
