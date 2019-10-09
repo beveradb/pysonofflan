@@ -6,8 +6,7 @@ import click
 import click_log
 from click_log import ClickHandler
 
-from sonoffswitch import SonoffSwitch
-from discover import Discover
+from pysonofflan import (SonoffSwitch, Discover)
 
 if sys.version_info < (3, 5):
     print("To use this script you need python 3.5 or newer! got %s" %
@@ -85,7 +84,7 @@ def discover():
     )
     found_devices = asyncio.get_event_loop().run_until_complete(
         Discover.discover(logger)).items()
-    for ip in found_devices:
+    for ip, found_device_id in found_devices:
         logger.info("Found Sonoff LAN Mode device at IP %s" % ip)
 
     return found_devices
@@ -116,13 +115,13 @@ def state(config: dict):
 @pass_config
 def on(config: dict):
     """Turn the device on."""
-    switch_device(config, 'on')
+    switch_device(config['host'], config['inching'], 'on')
 
 @cli.command()
 @pass_config
 def off(config: dict):
     """Turn the device off."""
-    switch_device(config, 'off')
+    switch_device(config['host'], config['inching'], 'off')
 
 
 @cli.command()
@@ -168,15 +167,15 @@ def print_device_details(device):
                     )
 
 
-def switch_device(config, new_state):
-    logger.info("Initialising SonoffSwitch with host %s" % config['host'])
+def switch_device(host, inching, new_state):
+    logger.info("Initialising SonoffSwitch with host %s" % host)
 
     async def update_callback(device: SonoffSwitch):
         if device.basic_info is not None:
 
             if device.available:
 
-                if config['inching'] is None:
+                if inching is None:
                     print_device_details(device)
 
                     if device.is_on:
@@ -193,12 +192,12 @@ def switch_device(config, new_state):
 
                 else:
                     logger.info("Inching device activated by switching ON for "
-                                "%ss" % config['inching'])
+                                "%ss" % inching)
 
     SonoffSwitch(
-        host=config['host'],
+        host=host,
         callback_after_update=update_callback,
-        inching_seconds=int(config['inching']) if config['host'] else None,
+        inching_seconds=int(inching) if inching else None,
         logger=logger,
         device_id=config['device_id'],
         api_key=config['api_key']
