@@ -61,7 +61,7 @@ blocking internet access** to their Sonoff devices.
 Features
 --------
 
-* Discover all devices on local network (192.168.0.0/24, 192.168.1.0/24)
+* Find all devices on local network (192.168.0.0/24, 192.168.1.0/24)
 * Discover IP address for device with known Device ID (from eWeLink app)
 * Read device state
 * Switch device ON/OFF
