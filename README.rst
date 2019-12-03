@@ -35,6 +35,10 @@ pySonoffLAN
 Control Sonoff devices running original firmware, in LAN mode.
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
+To control Sonoff switches running the V2 Itead firmware (tested on  V1.8.0 - V2.6.1), locally (LAN mode).
+
+This will **not** work for Sonoff devices running V3+ of the stock (Itead / eWeLink) firmware. For users of V3+, please see the code in this repository https://github.com/mattsaxon/pysonofflan
+
 This module provides a way to interface with Sonoff smart home devices,
 such as smart switches (e.g. Sonoff Basic), plugs (e.g. Sonoff S20),
 and wall switches (e.g. Sonoff Touch), when these devices are in LAN Mode.
