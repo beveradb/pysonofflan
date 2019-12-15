@@ -239,7 +239,7 @@ class SonoffDevice(object):
 
             switch_status = response['switches'][0]['switch']
 
-        elif self.client.type == b'plug' or self.client.type == b'diy_plug' or self.client.type == b'enhanced_plug':
+        elif self.client.type == b'plug' or self.client.type == b'diy_plug' or self.client.type == b'enhanced_plug' or self.client.type == b'th_plug':
 
             switch_status = response['switch']
 
