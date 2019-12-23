@@ -40,7 +40,8 @@ class SonoffSwitch(SonoffDevice):
                  timeout=SonoffLANModeClient.DEFAULT_TIMEOUT,
                  context: str = None,
                  device_id: str = None,
-                 api_key: str = None) -> None:
+                 api_key: str = None,
+                 outlet: int = None) -> None:
 
         self.inching_seconds = inching_seconds
         self.parent_callback_after_update = callback_after_update
@@ -61,7 +62,8 @@ class SonoffSwitch(SonoffDevice):
             timeout=timeout,
             context=context,
             device_id=device_id,
-            api_key=api_key
+            api_key=api_key,
+            outlet=outlet
         )
 
     @property

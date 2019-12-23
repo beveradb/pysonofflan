@@ -23,7 +23,8 @@ class SonoffDevice(object):
                  timeout=SonoffLANModeClient.DEFAULT_TIMEOUT,
                  context: str = None,
                  device_id: str = "",
-                 api_key: str = "") -> None:
+                 api_key: str = "",
+                 outlet: int = None) -> None:
         """
         Create a new SonoffDevice instance.
 
@@ -63,7 +64,8 @@ class SonoffDevice(object):
                 logger=self.logger,
                 loop=self.loop,
                 device_id=device_id,
-                api_key=api_key
+                api_key=api_key,
+                outlet=outlet
             )
 
             self.message_ping_event = asyncio.Event()

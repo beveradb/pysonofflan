@@ -47,11 +47,13 @@ class SonoffLANModeClient:
                  logger: logging.Logger = None,
                  loop = None,
                  device_id: str = "",
-                 api_key: str = ""):
+                 api_key: str = "",
+                 outlet: int = None):
 
         self.host = host
         self.device_id = device_id
         self.api_key = api_key
+        self.outlet = outlet
         self.logger = logger
         self.event_handler = event_handler
         self.connected_event = asyncio.Event()
@@ -254,8 +256,10 @@ class SonoffLANModeClient:
         ''' Hack for multi outlet switches, needs improving '''
 
         if self.type == b'strip':
+#        if device_id == "100065a8e3":
             switches = {"switches":[{"outlet":0,"switch":"off"}]}
             switches["switches"][0]["switch"] = params["switch"]
+            switches["switches"][0]["outlet"] = int(self.outlet)
             params = switches
 
         payload = {
@@ -352,10 +356,11 @@ class SonoffLANModeClient:
             padded = cipher.decrypt(ciphertext)
             plaintext = unpad(padded, AES.block_size)
 
-            return plaintext
-                    
         except Exception as ex:
             self.logger.error('Error decrypting for device %s: %s, probably wrong API key', self.device_id, format(ex)) 
+
+        return plaintext
+
 
     def parseAddress(self, address):
         """
