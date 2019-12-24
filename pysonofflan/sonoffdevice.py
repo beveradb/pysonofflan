@@ -35,6 +35,7 @@ class SonoffDevice(object):
         self.host = host
         self.context = context
         self.api_key = api_key
+        self.outlet = outlet
         self.shared_state = shared_state
         self.basic_info = None
         self.params = {"switch": "unknown"}
@@ -239,7 +240,7 @@ class SonoffDevice(object):
 
         if self.client.type == b'strip':
 
-            switch_status = response['switches'][0]['switch']
+            switch_status = response['switches'][self.outlet]['switch']
 
         elif self.client.type == b'plug' or self.client.type == b'diy_plug' or self.client.type == b'enhanced_plug' or self.client.type == b'th_plug':
 
