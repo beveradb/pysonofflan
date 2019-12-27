@@ -8,13 +8,13 @@ class MyListener:
 
     def remove_service(self, zeroconf, type, name):
 
-        if name == 'eWeLink_100065a8e3._ewelink._tcp.local.':
-            print("%s - Service %s removed" % (datetime.now(), name) )
+#        if name == 'eWeLink_100065a8e3._ewelink._tcp.local.':
+        print("%s - Service %s removed" % (datetime.now(), name) )
 
     def add_service(self, zeroconf, type, name):
 
-        if name == 'eWeLink_100065a8e3._ewelink._tcp.local.':
-            print("%s - Service %s added" % (datetime.now(), name) )
+#        if name == 'eWeLink_100065a8e3._ewelink._tcp.local.':
+        print("%s - Service %s added" % (datetime.now(), name) )
 
         # 
         # print(zeroconf.get_service_info(type, name))

@@ -66,6 +66,8 @@ class SonoffLANModeClient:
         self.encrypted = False
         self.type = None
 
+        self._last_params= {"switch": "off"}
+
         if self.logger is None:
             self.logger = logging.getLogger(__name__)
 
@@ -90,25 +92,8 @@ class SonoffLANModeClient:
     def remove_service(self, zeroconf, type, name):
 
         if self.my_service_name == name:
-
-            try:
-                # hack! send a wake-up message to the switch to see if its still there
-                # in testing on certain platforms (RPi) I found that the remove_service was called unexpectely when the device was available
-                # this didn't occur on other platforms (Hassio VM).
-                # I found that sending a HTTP REST message resulted in the device readding itself back on (via add_service) immediately
-                # rather than waiting for it to occur 'naturally'
-                # It could be that my Rpi is not picking up all broadcast messages and so the mDNS cache is expiring, but this has not been 
-                # investigated in detail. I would value feedback from other users to see if this 'hack' is called for their setup
-                
-                self.send_signal_strength(self.get_update_payload(self.device_id, None))
-                self.logger.debug("Service %s removed (but hack worked)" % name)
-
-            except OSError:
-                self.logger.info("Service %s removed" % name)
-                self.close_connection()
-
-        #else:
-        #    self.logger.debug("Service %s removed (not our switch)" % name)
+            self.logger.debug("Service %s flagged for removal" % name)
+            self.loop.run_in_executor(None, self.retry_connection )
 
 
     def add_service(self, zeroconf, type, name):
@@ -116,7 +101,7 @@ class SonoffLANModeClient:
         if self.my_service_name is not None:
         
             if self.my_service_name == name:
-                self.logger.debug("Service %s added (again, likely after hack)" % name)
+                self.logger.debug("Service %s added (again)" % name)
                 self.my_service_name = None
 
             #else:
@@ -177,7 +162,6 @@ class SonoffLANModeClient:
                 # process the initial message
                 self.update_service(zeroconf, type, name)
 
-
     def update_service(self, zeroconf, type, name):
 
         info = zeroconf.get_service_info(type, name)
@@ -217,26 +201,29 @@ class SonoffLANModeClient:
         asyncio.run_coroutine_threadsafe(self.event_handler(data), self.loop)
 
 
+    def retry_connection(self):
+
+        while True:
+            try:
+                self.logger.debug("Sending retry message for %s" % self.device_id)
+                self.send_signal_strength()
+                self.logger.info("Service %s not removed (hack worked)" % self.device_id)
+                break
+
+            except OSError as ex:
+                self.logger.debug('Connection issue for device %s: %s', self.device_id, format(ex))
+                self.logger.warn("Service %s removed" % self.device_id)
+                self.close_connection()
+                break
+
+            except Exception as ex:
+                self.logger.error('Unexpected error for device %s: %s %s', self.device_id, format(ex), traceback.format_exc)
+                break
+
+
     def send_switch(self, request: Union[str, Dict]):
 
-        return self.send(request, self.url + '/zeroconf/switch')
-
-
-    def send_signal_strength(self, request: Union[str, Dict]):
-
-        return self.send(request, self.url + '/zeroconf/signal_strength')
-
-
-    def send(self, request: Union[str, Dict], url):
-        """
-        Send message to an already-connected Sonoff LAN Mode Device
-        and return the response.
-        :param request: command to send to the device (can be dict or json)
-        :return:
-        """
-        self.logger.debug('Sending http message to %s: %s ', url, request)      
-        response = self.http_session.post(url, json=request)
-        self.logger.debug('response received: %s %s', response, response.content) 
+        response = self.send(request, self.url + '/zeroconf/switch')
 
         response_json = json.loads(response.content)
 
@@ -250,11 +237,37 @@ class SonoffLANModeClient:
             self.logger.debug('message sent to switch successfully') 
             # no need to do anything here, the update is processed via the mDNS TXT record update
 
+        return response
+
+
+    def send_signal_strength(self):
+
+        return self.send(self.get_update_payload(self.device_id, {} ), self.url + '/zeroconf/signal_strength')
+
+
+    def send_info(self, request: Union[str, Dict]):
+
+        return self.send(self.get_update_payload(self.device_id, {} ), self.url + '/zeroconf/info')
+
+
+    def send(self, request: Union[str, Dict], url):
+        """
+        Send message to an already-connected Sonoff LAN Mode Device
+        and return the response.
+        :param request: command to send to the device (can be dict or json)
+        :return:
+        """
+        self.logger.debug('Sending http message to %s: %s ', url, request)      
+        response = self.http_session.post(url, json=request)
+        self.logger.debug('response received: %s %s', response, response.content) 
+
+        return response
 
     def get_update_payload(self, device_id: str, params: dict) -> Dict:
 
-        ''' Hack for multi outlet switches, needs improving '''
+        self._last_params = params
 
+        ''' Hack for multi outlet switches, needs improving '''
         if self.type == b'strip':
 #        if device_id == "100065a8e3":
             switches = {"switches":[{"outlet":0,"switch":"off"}]}
@@ -262,12 +275,14 @@ class SonoffLANModeClient:
             switches["switches"][0]["outlet"] = int(self.outlet)
             params = switches
 
+
         payload = {
-            'sequence': str(int(time.time())), # ensure this field isn't too long, otherwise buffer overflow type issue caused in the device
-            'deviceid': device_id,
-            'selfApikey': '123',  # This field needs to exist, but no idea what it is used for (https://github.com/itead/Sonoff_Devices_DIY_Tools/issues/5)
-            'data': params
-        }
+            "sequence": str(int(time.time())), # ensure this field isn't too long, otherwise buffer overflow type issue caused in the device
+            "deviceid": device_id,
+            "selfApikey": '123',  # This field needs to exist, but no idea what it is used for (https://github.com/itead/Sonoff_Devices_DIY_Tools/issues/5)
+            "data": params
+            }
+
 
         self.logger.debug('message to send (plaintext): %s', payload)
 
