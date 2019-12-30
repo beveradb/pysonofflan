@@ -5,6 +5,7 @@ Python library supporting Sonoff Smart Devices (Basic/S20/Touch) in LAN Mode.
 import asyncio
 import json
 import logging
+import sys
 from typing import Callable, Awaitable, Dict
 
 import traceback
@@ -48,6 +49,24 @@ class SonoffDevice(object):
         else:
             self.logger = logger
 
+        # Ctrl-C (KeyboardInterrupt) does not work well on Windows
+        # This module solve that issue with wakeup coroutine.
+        # https://stackoverflow.com/questions/24774980/why-cant-i-catch-sigint-when-asyncio-event-loop-is-running/24775107#24775107
+        # code lifted from https://gist.github.com/lambdalisue/05d5654bd1ec04992ad316d50924137c
+        if sys.platform.startswith('win'):
+            def hotfix(loop: asyncio.AbstractEventLoop) -> asyncio.AbstractEventLoop:
+                loop.call_soon(_wakeup, loop, 1.0)
+                return loop
+
+            def _wakeup(loop: asyncio.AbstractEventLoop, delay: float=1.0) -> None:
+                loop.call_later(delay, _wakeup, loop, delay)
+
+        else:
+            # Do Nothing on non Windows
+            def hotfix(loop: asyncio.AbstractEventLoop) -> asyncio.AbstractEventLoop:
+                return loop
+
+
         try:
             if self.loop is None:
 
@@ -83,10 +102,12 @@ class SonoffDevice(object):
             self.tasks.append(self.send_updated_params_task)
 
             if self.new_loop:
+                hotfix(self.loop)  ## see Cltr-C hotfix earlier in routine
                 self.loop.run_until_complete(self.send_updated_params_task)
 
         except asyncio.CancelledError:
             self.logger.debug('SonoffDevice loop ended, returning')
+
 
     def calculate_retry(self, retry_count):
 
@@ -104,6 +125,7 @@ class SonoffDevice(object):
             self.logger.error('Unexpected error in wait_before_retry(): %s',
                 format(ex))
 
+
     async def send_availability_loop(self):
 
         self.logger.debug('enter send_availability_loop()')
@@ -118,8 +140,9 @@ class SonoffDevice(object):
 
                 self.logger.debug('connected event, sending update')
 
-                if self.callback_after_update is not None:
-                    await self.callback_after_update(self)
+                # this update doesn't need to be sent as handle_message will call it at the end
+                #if self.callback_after_update is not None:
+                #    await self.callback_after_update(self)
 
                 self.logger.debug('waiting for disconnection')
 
@@ -214,6 +237,7 @@ class SonoffDevice(object):
         finally:
             self.logger.debug('send_updated_params_loop finally block reached')
 
+
     def update_params(self, params):
 
         if self.params != params:
@@ -224,6 +248,7 @@ class SonoffDevice(object):
             self.params_updated_event.set()
         else:
             self.logger.debug('unnecessary update received, ignoring')
+
 
     async def handle_message(self, message):
         """
@@ -292,8 +317,7 @@ class SonoffDevice(object):
         if send_update and self.callback_after_update is not None:
             await self.callback_after_update(self)
 
-
-    
+   
     def shutdown_event_loop(self):
         self.logger.debug('shutdown_event_loop called')
 
@@ -347,6 +371,7 @@ class SonoffDevice(object):
                         self.loop.shutdown_asyncgens()
                     )
                     self.loop.close()
+
 
     @property
     def device_id(self) -> str:

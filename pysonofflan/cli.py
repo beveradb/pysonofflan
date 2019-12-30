@@ -6,6 +6,10 @@ import click
 import click_log
 from click_log import ClickHandler
 
+# ensure I can find this package even when it hasn't been installed (for development purposes)
+import sys
+sys.path.insert(0,'..')
+
 from pysonofflan import (SonoffSwitch, Discover)
 
 if sys.version_info < (3, 5):
@@ -84,10 +88,8 @@ def discover():
     )
     found_devices = asyncio.get_event_loop().run_until_complete(
         Discover.discover(logger)).items()
-    for ip, found_device_id in found_devices:
-        logger.info("Found Sonoff LAN Mode device at IP %s" % ip)
-
-    return found_devices
+    for found_device_id, ip in found_devices:
+        logger.debug("Found Sonoff LAN Mode device %s at socket %s" % (found_device_id,ip))
 
 @cli.command()
 @pass_config
@@ -115,13 +117,13 @@ def state(config: dict):
 @pass_config
 def on(config: dict):
     """Turn the device on."""
-    switch_device(config['host'], config['inching'], 'on')
+    switch_device(config, config['inching'], 'on')
 
 @cli.command()
 @pass_config
 def off(config: dict):
     """Turn the device off."""
-    switch_device(config['host'], config['inching'], 'off')
+    switch_device(config, config['inching'], 'off')
 
 
 @cli.command()
@@ -167,8 +169,8 @@ def print_device_details(device):
                     )
 
 
-def switch_device(host, inching, new_state):
-    logger.info("Initialising SonoffSwitch with host %s" % host)
+def switch_device(config: dict, inching, new_state):
+    logger.info("Initialising SonoffSwitch with host %s" % config['host'])
 
     async def update_callback(device: SonoffSwitch):
         if device.basic_info is not None:
@@ -195,7 +197,7 @@ def switch_device(host, inching, new_state):
                                 "%ss" % inching)
 
     SonoffSwitch(
-        host=host,
+        host=config['host'],
         callback_after_update=update_callback,
         inching_seconds=int(inching) if inching else None,
         logger=logger,
@@ -205,4 +207,5 @@ def switch_device(host, inching, new_state):
 
 
 if __name__ == "__main__":
+# pylint: disable=no-value-for-parameter
     cli()

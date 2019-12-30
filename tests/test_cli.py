@@ -7,8 +7,11 @@ import unittest
 
 from click.testing import CliRunner
 
-from pysonofflan import cli
+# ensure I can find this package even when it hasn't been installed (for development purposes)
+import sys
+sys.path.insert(0, '..')
 
+from pysonofflan import cli
 
 class TestCLI(unittest.TestCase):
     """Tests for pysonofflan CLI interface."""
@@ -75,5 +78,8 @@ class TestCLI(unittest.TestCase):
         """Test the CLI."""
         runner = CliRunner()
         result = runner.invoke(cli.cli, ['-l', 'DEBUG', 'discover'])
-        assert "Attempting connection to IP: 192.168.0.1 on port 8081" in \
+        assert "Looking for all eWeLink devices on local network" in \
                result.output
+
+if __name__ == '__main__':
+    unittest.main()

@@ -373,7 +373,8 @@ class SonoffLANModeClient:
 
         except Exception as ex:
             self.logger.error('Error decrypting for device %s: %s, probably wrong API key', self.device_id, format(ex)) 
-
+            raise
+        
         return plaintext
 
 
