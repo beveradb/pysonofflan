@@ -2,7 +2,6 @@ from flask import Flask, json, request
 from zeroconf import ServiceBrowser, Zeroconf, ServiceInfo
 import socket
 
-companies = [{"id": 1, "name": "Company One"}, {"id": 2, "name": "Company Two"}]
 
 api = Flask(__name__)
 
