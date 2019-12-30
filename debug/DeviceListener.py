@@ -1,6 +1,6 @@
 from datetime import datetime
-
-from zeroconf import ServiceBrowser, Zeroconf
+import time
+from zeroconf import ServiceBrowser, Zeroconf, ServiceInfo
 
 class MyListener:
 
@@ -9,13 +9,11 @@ class MyListener:
 
     def remove_service(self, zeroconf, type, name):
 
-#        if name == 'eWeLink_100065a8e3._ewelink._tcp.local.':
         print("%s - Service %s removed" % (datetime.now(), name) )
+
 
     def add_service(self, zeroconf, type, name):
 
-
-#        if name == 'eWeLink_100065a8e3._ewelink._tcp.local.':
         print("%s - Service %s added" % (datetime.now(), name) )
         info = zeroconf.get_service_info(type, name)
         print(info)
@@ -26,12 +24,12 @@ class MyListener:
 
         ServiceBrowser(zeroconf, name, listener)
 
+
     def update_service(self, zeroconf, type, name):
 
-        if name == 'eWeLink_100065a8e3._ewelink._tcp.local.a':
-            print("%s - Service %s updated" % (datetime.now(), name) )
-
-        # print(zeroconf.get_service_info(type, name))
+        print("%s - Service %s updated" % (datetime.now(), name) )
+        info = zeroconf.get_service_info(type, name)
+        print(info)
 
     def parseAddress(self, address):
         """
@@ -57,8 +55,4 @@ try:
 
 finally:
     zeroconf.close()
-
-
-
-
 

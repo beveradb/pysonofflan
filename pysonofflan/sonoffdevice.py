@@ -256,12 +256,11 @@ class SonoffDevice(object):
         state or storing basic device info
         """
 
-        self.logger.debug('enter handle_mesage()')
+        self.logger.debug('enter handle_mesage() %s', message)
 
         self.message_ping_event.set()
 
         response = json.loads(message)
-
 
         if self.client.type == b'strip':
 

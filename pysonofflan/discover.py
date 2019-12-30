@@ -29,7 +29,7 @@ class Discover:
         ServiceBrowser(zeroconf, "_ewelink._tcp.local.", listener)
 
         if seconds_to_wait == None:
-            time.sleep(1)
+            time.sleep(4)
 
         else:
             time.sleep(seconds_to_wait)
