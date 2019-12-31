@@ -170,30 +170,30 @@ class SonoffLANModeClient:
         self.type = info.properties.get(b'type')
         self.logger.debug("type: %s", self.type)
 
+        data1 = info.properties.get(b'data1')
+        data2 = info.properties.get(b'data2')
+
+        if data2 is not None:
+            data1 += data2
+            data3 = info.properties.get(b'data3')
+
+            if data3 is not None:              
+                data1 += data3
+                data4 = info.properties.get(b'data4')
+
+                if data4 is not None:
+                    data1 += data4
+
         if info.properties.get(b'encrypt'):
+            self.encrypted = True
             # decrypt the message
             iv = info.properties.get(b'iv')
-            data1 = info.properties.get(b'data1')
-            if len(data1) == 249:
-                data2 = info.properties.get(b'data2')
-                data1 += data2
-
-                if len(data2) == 249:
-                    data3 = info.properties.get(b'data3')
-                    data1 += data3
-
-                    if len(data3) == 249:
-                        data4 = info.properties.get(b'data4')
-                        data1 += data4
-
-            plaintext = self.decrypt(data1,iv)
-            data = plaintext
-            self.logger.debug("decrypted data: %s", plaintext)
-            self.encrypted = True
+            data = self.decrypt(data1,iv)
+            self.logger.debug("decrypted data: %s", data)
 
         else:
-            data = info.properties.get(b'data1')
             self.encrypted = False
+            data = data1
 
         self.properties = info.properties
 
@@ -225,20 +225,27 @@ class SonoffLANModeClient:
 
         response = self.send(request, self.url + '/zeroconf/switch')
 
-        response_json = json.loads(response.content)
+        try:
+            response_json = json.loads(response.content)
 
-        error = response_json['error']
+            error = response_json['error']
 
-        if error != 0:
-            self.logger.warn('error received: %s, %s', self.device_id, response.content)
-            # no need to process error, retry will resend message which should be sufficient
+            if error != 0:
+                self.logger.warn('error received: %s, %s', self.device_id, response.content)
+                # no need to process error, retry will resend message which should be sufficient
 
-        else:
-            self.logger.debug('message sent to switch successfully') 
-            # no need to do anything here, the update is processed via the mDNS TXT record update
+            else:
+                self.logger.debug('message sent to switch successfully') 
+                # no need to do anything here, the update is processed via the mDNS TXT record update
 
-        return response
+            return response
 
+        except:
+            self.logger.error('error processing response: %s, %s', response, response.content)
+
+        finally:
+
+            return
 
     def send_signal_strength(self):
 
@@ -269,7 +276,10 @@ class SonoffLANModeClient:
 
         ''' Hack for multi outlet switches, needs improving '''
         if self.type == b'strip':
-#        if device_id == "100065a8e3":
+
+            if self.outlet is None:
+                self.outlet = 0
+
             switches = {"switches":[{"outlet":0,"switch":"off"}]}
             switches["switches"][0]["switch"] = params["switch"]
             switches["switches"][0]["outlet"] = int(self.outlet)

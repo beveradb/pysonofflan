@@ -2,25 +2,23 @@
 # -*- coding: utf-8 -*-
 
 """Tests for `pysonofflan` package."""
-
 import unittest
-
 from click.testing import CliRunner
-
-# ensure I can find this package even when it hasn't been installed (for development purposes)
-import sys
-sys.path.insert(0, '..')
-
 from pysonofflan import cli
+from RESTServer import start_device, stop_device
 
 class TestCLI(unittest.TestCase):
     """Tests for pysonofflan CLI interface."""
 
     def setUp(self):
+
         """Set up test fixtures, if any."""
+
 
     def tearDown(self):
         """Tear down test fixtures, if any."""
+
+        #stop_device()
 
     def test_cli_no_args(self):
         """Test the CLI."""
@@ -67,12 +65,62 @@ class TestCLI(unittest.TestCase):
         result = runner.invoke(cli.cli, ['state'])
         assert 'No host name or device_id given, see usage below' in result.output
 
-    def test_cli_discover(self):
+    def test_cli_on(self):
+
+        start_device("PlugDeviceOn", "plug")
+
+        """Test the CLI."""
+        runner = CliRunner()
+        result = runner.invoke(cli.cli, ['--device_id', 'PlugDeviceOn', 'on'])
+        assert 'info: State: ON' in result.output
+
+        stop_device()
+
+    def test_cli_off(self):
+
+        start_device("PlugDeviceOff", "plug")
+
+        """Test the CLI."""
+        runner = CliRunner()
+        result = runner.invoke(cli.cli, ['--device_id', 'PlugDeviceOff', 'off'])
+        assert 'info: State: OFF' in result.output
+
+        stop_device()        
+
+    def test_cli_on_strip(self):
+
+        start_device("StripDeviceOn", "strip")
+
+        """Test the CLI."""
+        runner = CliRunner()
+        result = runner.invoke(cli.cli, ['--device_id', 'StripDeviceOn', 'on'])
+        assert 'info: State: ON' in result.output
+
+        stop_device()
+
+    def test_cli_off_strip(self):
+
+        start_device("StripDeviceOff", "strip")
+
+        """Test the CLI."""
+        runner = CliRunner()
+        result = runner.invoke(cli.cli, ['--device_id', 'StripDeviceOff', 'on'])
+        assert 'info: State: OFF' in result.output
+
+        stop_device()
+
+    def test_cli_discover(self):   
+
+        start_device("DiscoverDevice", "plug")
+
         """Test the CLI."""
         runner = CliRunner()
         result = runner.invoke(cli.cli, ['discover'])
         assert "Attempting to discover Sonoff LAN Mode devices on the local " \
                "network" in result.output
+        assert "DiscoverDevice" in result.output
+
+        stop_device()
 
     def test_cli_discover_debug(self):
         """Test the CLI."""

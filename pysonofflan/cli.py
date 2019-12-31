@@ -6,10 +6,6 @@ import click
 import click_log
 from click_log import ClickHandler
 
-# ensure I can find this package even when it hasn't been installed (for development purposes)
-import sys
-sys.path.insert(0,'..')
-
 from pysonofflan import (SonoffSwitch, Discover)
 
 if sys.version_info < (3, 5):
