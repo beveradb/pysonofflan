@@ -21,13 +21,16 @@ class SonoffLANModeDeviceMock:
 
     def __init__(self, name, sonoff_type, ip, port):
 
-        self._name = name
+        self._name = name 
         self._sonoff_type = sonoff_type
         self._ip = ip
         self._port = port
 
         if self._name is None:
-            self._name = "TestDevice"
+            self._name = ""
+
+        self._name += "Mock"
+
 
         if self._sonoff_type is None:
             self._sonoff_type = "plug"
@@ -39,6 +42,7 @@ class SonoffLANModeDeviceMock:
             self._port = 8081
 
         self._status = "off"
+
 
         self.register_on_network()
 
@@ -128,6 +132,7 @@ def start(name, sonoff_type, ip, port):
     global device
     device = SonoffLANModeDeviceMock(name, sonoff_type, ip, port)
     device.run_server()
+
 
 if __name__ == '__main__':
 

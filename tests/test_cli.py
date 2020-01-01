@@ -5,20 +5,16 @@
 import unittest
 from click.testing import CliRunner
 from pysonofflan import cli
-from RESTServer import start_device, stop_device
+from tests.sonoff_mock import start_device, stop_device
 
 class TestCLI(unittest.TestCase):
     """Tests for pysonofflan CLI interface."""
 
     def setUp(self):
-
         """Set up test fixtures, if any."""
-
 
     def tearDown(self):
         """Tear down test fixtures, if any."""
-
-        #stop_device()
 
     def test_cli_no_args(self):
         """Test the CLI."""
@@ -67,44 +63,44 @@ class TestCLI(unittest.TestCase):
 
     def test_cli_on(self):
 
-        start_device("PlugDeviceOn", "plug")
+        start_device("PlugOn", "plug")
 
         """Test the CLI."""
         runner = CliRunner()
-        result = runner.invoke(cli.cli, ['--device_id', 'PlugDeviceOn', 'on'])
+        result = runner.invoke(cli.cli, ['--device_id', 'PlugOn', 'on'])
         assert 'info: State: ON' in result.output
 
         stop_device()
 
     def test_cli_off(self):
 
-        start_device("PlugDeviceOff", "plug")
+        start_device("PlugOff", "plug")
 
         """Test the CLI."""
         runner = CliRunner()
-        result = runner.invoke(cli.cli, ['--device_id', 'PlugDeviceOff', 'off'])
+        result = runner.invoke(cli.cli, ['--device_id', 'PlugOff', 'off'])
         assert 'info: State: OFF' in result.output
 
         stop_device()        
 
     def test_cli_on_strip(self):
 
-        start_device("StripDeviceOn", "strip")
+        start_device("StripOn", "strip")
 
         """Test the CLI."""
         runner = CliRunner()
-        result = runner.invoke(cli.cli, ['--device_id', 'StripDeviceOn', 'on'])
+        result = runner.invoke(cli.cli, ['--device_id', 'StripOn', 'on'])
         assert 'info: State: ON' in result.output
 
         stop_device()
 
     def test_cli_off_strip(self):
 
-        start_device("StripDeviceOff", "strip")
+        start_device("StripOff", "strip")
 
         """Test the CLI."""
         runner = CliRunner()
-        result = runner.invoke(cli.cli, ['--device_id', 'StripDeviceOff', 'on'])
+        result = runner.invoke(cli.cli, ['--device_id', 'StripOff', 'on'])
         assert 'info: State: OFF' in result.output
 
         stop_device()
