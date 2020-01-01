@@ -1,8 +1,9 @@
 import sys
-from flask import Flask, json, request
-from zeroconf import ServiceBrowser, Zeroconf, ServiceInfo
 import socket
 import threading
+from flask import Flask, json, request
+from zeroconf import ServiceBrowser, Zeroconf, ServiceInfo
+from pysonofflan import sonoffcrypto
 
 api = Flask(__name__)
 device = None
@@ -19,10 +20,11 @@ def post_switch():
 
 class SonoffLANModeDeviceMock:
 
-    def __init__(self, name, sonoff_type, ip, port):
+    def __init__(self, name, sonoff_type, api_key, ip, port):
 
         self._name = name 
         self._sonoff_type = sonoff_type
+        self._api_key = api_key
         self._ip = ip
         self._port = port
 
@@ -31,10 +33,14 @@ class SonoffLANModeDeviceMock:
 
         self._name += "Mock"
 
-
         if self._sonoff_type is None:
             self._sonoff_type = "plug"
 
+        if self._api_key == "None" or self._api_key is None:
+            self._encrypt = False
+        else:
+            self._encrypt = True
+            
         if self._ip is None:
             self._ip = "127.0.0.1"
 
@@ -56,7 +62,6 @@ class SonoffLANModeDeviceMock:
         self._properties = dict(
             id = self._name,
             type = self._sonoff_type,
-            encrypt = False,
         )
 
         self.set_data()
@@ -96,18 +101,34 @@ class SonoffLANModeDeviceMock:
             else:
                 self._properties['data1'] = '{"switch":"off","startup":"stay","pulse":"off","sledOnline":"off","pulseWidth":500,"rssi":-55}'
 
+        
+        if self._encrypt:
+            sonoffcrypto.format_encryption_txt(self._properties, self._api_key)
+            print(self._properties)
+       
 
-    def get_status_from_json(self, json):
+    def get_status_from_data(self, data):
 
         if self._sonoff_type == "strip":
-            return json['data']['switches'][0]['switch']
+            return data['switches'][0]['switch']
 
         else:
-            return json['data']['switch']
+            return data['switch']
 
-    def process_request(self, json):
+    def process_request(self, json_):
 
-        self._status = self.get_status_from_json(request.json)
+        if json_['encrypt'] == True:
+            iv = json_['iv']
+            data = sonoffcrypto.decrypt(json_['data'], iv, self._api_key)
+            import json
+            data = json.loads(data)
+
+        else:
+            data = json_['data']
+
+        print(data)
+
+        self._status = self.get_status_from_data(data)
         self.set_data()
 
         print("Updated Properties: %s" % self._properties)
@@ -115,9 +136,9 @@ class SonoffLANModeDeviceMock:
         self._zeroconf_registrar.update_service(self.get_service_info())
 
 
-def start_device(name = None, device_type = None, ip = None, port = None):
+def start_device(name = None, device_type = None, api_key = None, ip = None, port = None):
       
-    t = threading.Thread(target=start, args=(name, device_type, ip, port))
+    t = threading.Thread(target=start, args=(name, device_type, api_key, ip, port))
     t.daemon = True
     t.start()
 
@@ -127,10 +148,10 @@ def stop_device():
     api.do_teardown_appcontext()
 
 
-def start(name, sonoff_type, ip, port):
+def start(name, sonoff_type, api_key, ip, port):
 
     global device
-    device = SonoffLANModeDeviceMock(name, sonoff_type, ip, port)
+    device = SonoffLANModeDeviceMock(name, sonoff_type, api_key, ip, port)
     device.run_server()
 
 
@@ -138,15 +159,17 @@ if __name__ == '__main__':
 
     name = None
     sonoff_type = None
+    api_key = None
     ip = None
     port = None
 
     try:
         name = sys.argv[1]
         sonoff_type = sys.argv[2]
-        ip = sys.argv[3]
-        port = int(sys.argv[4])
+        api_key = sys.argv[3]
+        ip = sys.argv[4]
+        port = int(sys.argv[5])
     except:
         pass
 
-    start(name, sonoff_type, ip, port)
+    start(name, sonoff_type, api_key, ip, port)

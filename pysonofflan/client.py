@@ -12,12 +12,7 @@ import traceback
 import requests
 from zeroconf import ServiceBrowser, Zeroconf
 
-from Crypto.Hash import MD5
-from Crypto.Cipher import AES
-from Crypto.Util.Padding import unpad, pad
-from base64 import b64decode, b64encode
-from Crypto.Random import get_random_bytes
-
+from . import sonoffcrypto
 import socket
 
 class SonoffLANModeClient:
@@ -164,41 +159,45 @@ class SonoffLANModeClient:
 
     def update_service(self, zeroconf, type, name):
 
-        info = zeroconf.get_service_info(type, name)
-        self.logger.debug("properties: %s",info.properties)
+        try:
+            info = zeroconf.get_service_info(type, name)
+            self.logger.debug("properties: %s",info.properties)
 
-        self.type = info.properties.get(b'type')
-        self.logger.debug("type: %s", self.type)
+            self.type = info.properties.get(b'type')
+            self.logger.debug("type: %s", self.type)
 
-        data1 = info.properties.get(b'data1')
-        data2 = info.properties.get(b'data2')
+            data1 = info.properties.get(b'data1')
+            data2 = info.properties.get(b'data2')
 
-        if data2 is not None:
-            data1 += data2
-            data3 = info.properties.get(b'data3')
+            if data2 is not None:
+                data1 += data2
+                data3 = info.properties.get(b'data3')
 
-            if data3 is not None:              
-                data1 += data3
-                data4 = info.properties.get(b'data4')
+                if data3 is not None:              
+                    data1 += data3
+                    data4 = info.properties.get(b'data4')
 
-                if data4 is not None:
-                    data1 += data4
+                    if data4 is not None:
+                        data1 += data4
 
-        if info.properties.get(b'encrypt'):
-            self.encrypted = True
-            # decrypt the message
-            iv = info.properties.get(b'iv')
-            data = self.decrypt(data1,iv)
-            self.logger.debug("decrypted data: %s", data)
+            if info.properties.get(b'encrypt'):
+                self.encrypted = True
+                # decrypt the message
+                iv = info.properties.get(b'iv')
+                data = sonoffcrypto.decrypt(data1,iv, self.api_key)
+                self.logger.debug("decrypted data: %s", data)
 
-        else:
-            self.encrypted = False
-            data = data1
+            else:
+                self.encrypted = False
+                data = data1
 
-        self.properties = info.properties
+            self.properties = info.properties
 
-        # process the events on an event loop (this method is on a background thread called from zeroconf)
-        asyncio.run_coroutine_threadsafe(self.event_handler(data), self.loop)
+            # process the events on an event loop (this method is on a background thread called from zeroconf)
+            asyncio.run_coroutine_threadsafe(self.event_handler(data), self.loop)
+
+        except Exception as ex:
+            self.logger.error('Error updating service for device %s: %s, probably wrong API key', self.device_id, format(ex)) 
 
 
     def retry_connection(self):
@@ -299,7 +298,7 @@ class SonoffLANModeClient:
         if self.encrypted:
 
             if self.api_key != "" and self.api_key is not None:
-                self.format_encryption(payload)
+                sonoffcrypto.format_encryption_msg(payload, self.api_key)
                 self.logger.debug('encrypted: %s', payload)
             else:
                 self.logger.error('missing api_key field for device: %s', self.device_id) 
@@ -310,82 +309,7 @@ class SonoffLANModeClient:
         return payload
 
         
-    """ Encrpytion routines as documented in https://github.com/itead/Sonoff_Devices_DIY_Tools/blob/master/other/SONOFF%20DIY%20MODE%20Protocol%20Doc.pdf
-    
-    Here are an abstract of the document with the partinent parts for the alogrithm
-    
-        The default password must be the API Key of the device. 
-        
-        The key used for encryption is the MD5 hash of the device password (16 bytes)
-        
-        The initialization vector iv used for encryption is a 16-byte random number, Base64 encoded as a string
-        
-        The encryption algorithm must be "AES-128-CBC/PKCS7Padding" (AES 128 Cipher Block Chaining (CBC) with PKCS7 Padding)
-        
-        When the device information (unencrypted or encrypted string) is longer than 249 bytes, the first 249 bytes must be stored in data1, and the remaining bytes are divided by length 249, which are stored in data2, data3, and data4.
-        
-        [This last part is currently unimplemented as I haven't seen a mesage longer than 249 bytes as yet, proably will have on multi-channel devices]
-        
-        
-    """
 
-    def format_encryption(self, data):
-
-        encrypt = True
-        data["encrypt"] = encrypt
-        if encrypt:
-            iv = self.generate_iv()
-            data["iv"] = b64encode(iv).decode("utf-8") 
-
-            if data["data"] is None:
-                # data["data"] = self.encrypt("{ }", iv)
-                data["data"] = ""
-            else:
-                data["data"] = self.encrypt(json.dumps(data["data"]), iv)
-
-
-    def encrypt(self, data_element, iv):
-
-        api_key = bytes(self.api_key, 'utf-8') 
-        plaintext = bytes(data_element, 'utf-8')
-
-        hash = MD5.new()
-        hash.update(api_key)
-        key = hash.digest()
-
-        cipher = AES.new(key, AES.MODE_CBC, iv=iv)     
-        padded = pad(plaintext, AES.block_size)
-        ciphertext = cipher.encrypt(padded)
-        encoded = b64encode(ciphertext) 
-
-        return encoded.decode("utf-8")
-
-
-    def generate_iv(self):
-        return get_random_bytes(16)
-
-
-    def decrypt(self, data_element, iv):
-
-        try:
-
-            api_key = bytes(self.api_key, 'utf-8')
-            encoded =  data_element
-
-            hash = MD5.new()
-            hash.update(api_key)
-            key = hash.digest()
-
-            cipher = AES.new(key, AES.MODE_CBC, iv=b64decode(iv))
-            ciphertext = b64decode(encoded)        
-            padded = cipher.decrypt(ciphertext)
-            plaintext = unpad(padded, AES.block_size)
-
-        except Exception as ex:
-            self.logger.error('Error decrypting for device %s: %s, probably wrong API key', self.device_id, format(ex)) 
-            raise
-        
-        return plaintext
 
 
     def parseAddress(self, address):
