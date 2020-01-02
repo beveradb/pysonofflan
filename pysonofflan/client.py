@@ -136,9 +136,15 @@ class SonoffLANModeClient:
 
                 # add the http headers
                 headers = { 'Content-Type': 'application/json;charset=UTF-8',
+                    'User-Agent': 'ewelinkDemo/2 CFNetwork/1121.2.2 Darwin/19.2.0',
+                    'Connection': 'keep-alive',
                     'Accept': 'application/json',
-                    'Accept-Language': 'en-gb'        
-                }    
+                    'Accept-Language': 'en-gb',
+                    'Content-Length': "0",
+                    'Accept-Encoding': 'gzip, deflate',
+                    'Cache-Control': 'no-store'        
+                }
+
                 self.http_session.headers.update(headers)
 
                 # find socket for end-point
@@ -264,10 +270,9 @@ class SonoffLANModeClient:
         :return:
         """
         
-        headers = {'User-Agent': 'ewelinkDemo/2 CFNetwork/1121.2.2 Darwin/19.2.0', 'Cache-Control': 'no-store'}
         data = json.dumps(request,  separators = (',', ':'))
         self.logger.debug('Sending http message to %s: %s', url, data)      
-        response = self.http_session.post(url, headers=headers, data=data)
+        response = self.http_session.post(url, data=data)
         self.logger.debug('response received: %s %s', response, response.content) 
 
         return response
