@@ -216,7 +216,7 @@ class SonoffLANModeClient:
                 break
 
             except Exception as ex:
-                self.logger.error('Unexpected error for device %s: %s %s', self.device_id, format(ex), traceback.format_exc)
+                self.logger.error('Retry_connection() Unexpected error for device %s: %s %s', self.device_id, format(ex), traceback.format_exc)
                 break
 
 

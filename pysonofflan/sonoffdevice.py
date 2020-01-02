@@ -225,14 +225,14 @@ class SonoffDevice(object):
                     retry_count += 1
 
                 except Exception as ex:
-                    self.logger.error('Unexpected error for device %s: %s %s', self.device_id, format(ex), traceback.format_exc)
+                    self.logger.error('send_updated_params_loop() [inner block] Unexpected error for device %s: %s %s', self.device_id, format(ex), traceback.format_exc)
                     break
 
         except asyncio.CancelledError:
             self.logger.debug('send_updated_params_loop cancelled')
 
         except Exception as ex:
-            self.logger.error('Unexpected error for device %s: %s %s', self.device_id, format(ex), traceback.format_exc)
+            self.logger.error('send_updated_params_loop() [outer block] Unexpected error for device %s: %s %s', self.device_id, format(ex), traceback.format_exc)
 
         finally:
             self.logger.debug('send_updated_params_loop finally block reached')
