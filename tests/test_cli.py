@@ -72,6 +72,8 @@ class TestCLI(unittest.TestCase):
 
         stop_device()
 
+        print(result.output)
+
     def test_cli_off(self):
 
         start_device("PlugOff", "plug")
@@ -82,6 +84,8 @@ class TestCLI(unittest.TestCase):
         assert 'info: State: OFF' in result.output
 
         stop_device()        
+
+        print(result.output)
 
     def test_cli_on_strip(self):
 
@@ -94,6 +98,8 @@ class TestCLI(unittest.TestCase):
 
         stop_device()
 
+        print(result.output)
+
     def test_cli_off_strip(self):
 
         start_device("StripOff", "strip")
@@ -105,6 +111,8 @@ class TestCLI(unittest.TestCase):
 
         stop_device()
 
+        print(result.output)
+
     def test_cli_on_encrypt(self):
 
         start_device("PlugEncrypt", "plug")
@@ -113,6 +121,8 @@ class TestCLI(unittest.TestCase):
         runner = CliRunner()
         result = runner.invoke(cli.cli, ['--device_id', 'PlugEncryptMock', '--api_key', 'testkey', 'on'])
         assert 'info: State: ON' in result.output
+
+        print(result.output)
 
     def test_cli_on_strip_encrypt(self):
 
@@ -125,6 +135,7 @@ class TestCLI(unittest.TestCase):
 
         stop_device()
 
+        print(result.output)
 
     def test_cli_discover(self):   
 
@@ -140,6 +151,8 @@ class TestCLI(unittest.TestCase):
         assert "DiscoverDevice" in result.output     
 
         stop_device()
+
+        print(result.output)
 
     def test_cli_discover_debug(self):
         """Test the CLI."""

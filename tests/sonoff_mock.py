@@ -13,7 +13,10 @@ def post_switch():
 
     print("Received: %s" % request.json)
 
-    device.process_request(request.json)
+    if request.json['deviceid'] == device._name:
+        device.process_request(request.json)
+    else:
+        print("wrong device")
 
     return json.dumps({"seq":1,"sequence":"1577725767","error":0}), 200
 
