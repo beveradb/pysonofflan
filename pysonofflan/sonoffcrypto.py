@@ -24,18 +24,18 @@ from base64 import b64decode, b64encode
 from Crypto.Random import get_random_bytes
 import json
 
-def format_encryption_msg(data, api_key):
+def format_encryption_msg(payload, api_key, data):
 
-    data["encrypt"] = True
-
+    payload["selfApikey"] = "cb0ff096-2a9d-4250-93ec-362fc1fe6f40" # This field needs to exist, but no idea what it is used for (https://github.com/itead/Sonoff_Devices_DIY_Tools/issues/5)
     iv = generate_iv()
-    data["iv"] = b64encode(iv).decode("utf-8") 
-
-    if data["data"] is None:
+    payload["iv"] = b64encode(iv).decode("utf-8") 
+    payload["encrypt"] = True
+ 
+    if data is None:
         # data["data"] = encrypt("{ }", iv)
-        data["data"] = ""
+        payload["data"] = ""
     else:
-        data["data"] = encrypt(json.dumps(data["data"]), iv, api_key)
+        payload["data"] = encrypt(json.dumps(data, separators = (',', ':') ), iv, api_key)
 
 
 def format_encryption_txt(data, api_key):

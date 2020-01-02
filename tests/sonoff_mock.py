@@ -15,7 +15,7 @@ def post_switch():
 
     device.process_request(request.json)
 
-    return json.dumps({"seq":41,"sequence":"1577725767","error":0}), 200
+    return json.dumps({"seq":1,"sequence":"1577725767","error":0}), 200
 
 
 class SonoffLANModeDeviceMock:
@@ -124,6 +124,7 @@ class SonoffLANModeDeviceMock:
             data = json.loads(data)
 
         else:
+            print(json_)
             data = json_['data']
 
         print(data)

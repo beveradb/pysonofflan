@@ -24,13 +24,14 @@ class MyListener:
             print("%s - Service %s updated" % (datetime.now(), name) )
             print (zeroconf.get_service_info(type, name))
 
+if __name__ == '__main__':
 
-zeroconf = Zeroconf()
-listener = MyListener()
-browser = ServiceBrowser(zeroconf, "_ewelink._tcp.local.", listener)
+    zeroconf = Zeroconf()
+    listener = MyListener()
+    browser = ServiceBrowser(zeroconf, "_ewelink._tcp.local.", listener)
 
-try:
-    input("Press enter to exit...\n\n")
+    try:
+        input("Press enter to exit...\n\n")
 
-finally:
-    zeroconf.close()
+    finally:
+        zeroconf.close()

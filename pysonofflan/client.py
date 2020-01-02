@@ -263,8 +263,11 @@ class SonoffLANModeClient:
         :param request: command to send to the device (can be dict or json)
         :return:
         """
-        self.logger.debug('Sending http message to %s: %s ', url, request)      
-        response = self.http_session.post(url, json=request)
+        
+        headers = {'User-Agent': 'ewelinkDemo/2 CFNetwork/1121.2.2 Darwin/19.2.0', 'Cache-Control': 'no-store'}
+        data = json.dumps(request,  separators = (',', ':'))
+        self.logger.debug('Sending http message to %s: %s', url, data)      
+        response = self.http_session.post(url, headers=headers, data=data)
         self.logger.debug('response received: %s %s', response, response.content) 
 
         return response
@@ -279,32 +282,33 @@ class SonoffLANModeClient:
             if self.outlet is None:
                 self.outlet = 0
 
-            switches = {"switches":[{"outlet":0,"switch":"off"}]}
+            switches = {"switches":[{"switch":"off","outlet":0}]}
             switches["switches"][0]["switch"] = params["switch"]
             switches["switches"][0]["outlet"] = int(self.outlet)
             params = switches
 
 
         payload = {
-            "sequence": str(int(time.time())), # ensure this field isn't too long, otherwise buffer overflow type issue caused in the device
+            "sequence": str(int(time.time()*1000)), # ensure this field isn't too long, otherwise buffer overflow type issue caused in the device
             "deviceid": device_id,
-            "selfApikey": '123',  # This field needs to exist, but no idea what it is used for (https://github.com/itead/Sonoff_Devices_DIY_Tools/issues/5)
-            "data": params
             }
 
 
-        self.logger.debug('message to send (plaintext): %s', payload)
-
         if self.encrypted:
 
+            self.logger.debug('params: %s', params)
+
             if self.api_key != "" and self.api_key is not None:
-                sonoffcrypto.format_encryption_msg(payload, self.api_key)
+                sonoffcrypto.format_encryption_msg(payload, self.api_key, params)
                 self.logger.debug('encrypted: %s', payload)
+
             else:
                 self.logger.error('missing api_key field for device: %s', self.device_id) 
 
         else:
             payload["encrypt"] = False
+            payload["data"] = params
+            self.logger.debug('message to send (plaintext): %s', payload)
 
         return payload
 
