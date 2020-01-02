@@ -8,7 +8,7 @@ import asyncio
 import threading
 import enum
 import traceback
-
+import collections
 import requests
 from zeroconf import ServiceBrowser, Zeroconf
 
@@ -135,7 +135,7 @@ class SonoffLANModeClient:
                 self.http_session = requests.Session()
 
                 # add the http headers
-                headers = { 'Content-Type': 'application/json;charset=UTF-8',
+                headers = collections.OrderedDict( { 'Content-Type': 'application/json;charset=UTF-8',
                     'User-Agent': 'ewelinkDemo/2 CFNetwork/1121.2.2 Darwin/19.2.0',
                     'Connection': 'keep-alive',
                     'Accept': 'application/json',
@@ -143,7 +143,7 @@ class SonoffLANModeClient:
                     'Content-Length': "0",
                     'Accept-Encoding': 'gzip, deflate',
                     'Cache-Control': 'no-store'        
-                }
+                } )
 
                 self.http_session.headers.update(headers)
 

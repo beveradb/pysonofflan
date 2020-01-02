@@ -11,7 +11,7 @@ device = None
 @api.route('/zeroconf/switch', methods=['POST'])
 def post_switch():
 
-    print("Received: %s" % request.json)
+    print("Device %s, Received: %s" % (device._name, request.json))
 
     if request.json['deviceid'] == device._name:
         device.process_request(request.json)
@@ -142,15 +142,17 @@ class SonoffLANModeDeviceMock:
 
 def start_device(name = None, device_type = None, api_key = None, ip = None, port = None):
       
+    print("starting device: %s" % name)
     t = threading.Thread(target=start, args=(name, device_type, api_key, ip, port))
     t.daemon = True
     t.start()
-
+    print("device started: %s" % name)
 
 def stop_device():
 
+    print("stopping device")
     api.do_teardown_appcontext()
-
+    print("device stopped")
 
 def start(name, sonoff_type, api_key, ip, port):
 
