@@ -68,11 +68,12 @@ class TestCLI(unittest.TestCase):
         """Test the CLI."""
         runner = CliRunner()
         result = runner.invoke(cli.cli, ['--device_id', 'PlugOnMock', 'on'])
+
+        print(result.output)
+        
         assert 'info: State: ON' in result.output
 
         stop_device()
-
-        print(result.output)
 
     def test_cli_off(self):
 
@@ -81,11 +82,12 @@ class TestCLI(unittest.TestCase):
         """Test the CLI."""
         runner = CliRunner()
         result = runner.invoke(cli.cli, ['--device_id', 'PlugOffMock', 'off'])
+
+        print(result.output)
+
         assert 'info: State: OFF' in result.output
 
         stop_device()        
-
-        print(result.output)
 
     def test_cli_on_strip(self):
 
@@ -94,11 +96,12 @@ class TestCLI(unittest.TestCase):
         """Test the CLI."""
         runner = CliRunner()
         result = runner.invoke(cli.cli, ['--device_id', 'StripOnMock', 'on'])
+
+        print(result.output)
+
         assert 'info: State: ON' in result.output
 
         stop_device()
-
-        print(result.output)
 
     def test_cli_off_strip(self):
 
@@ -107,11 +110,12 @@ class TestCLI(unittest.TestCase):
         """Test the CLI."""
         runner = CliRunner()
         result = runner.invoke(cli.cli, ['--device_id', 'StripOffMock', 'on'])
+
+        print(result.output)
+
         assert 'info: State: OFF' in result.output
 
         stop_device()
-
-        print(result.output)
 
     def test_cli_on_encrypt(self):
 
@@ -120,9 +124,10 @@ class TestCLI(unittest.TestCase):
         """Test the CLI."""
         runner = CliRunner()
         result = runner.invoke(cli.cli, ['--device_id', 'PlugEncryptMock', '--api_key', 'testkey', 'on'])
-        assert 'info: State: ON' in result.output
 
         print(result.output)
+
+        assert 'info: State: ON' in result.output
 
     def test_cli_on_strip_encrypt(self):
 
@@ -131,11 +136,12 @@ class TestCLI(unittest.TestCase):
         """Test the CLI."""
         runner = CliRunner()
         result = runner.invoke(cli.cli, ['--device_id', 'StripEncryptMock', '--api_key', 'testkey', 'on'])
+
+        print(result.output)
+
         assert 'info: State: ON' in result.output
 
         stop_device()
-
-        print(result.output)
 
     def test_cli_discover(self):   
 
@@ -145,14 +151,13 @@ class TestCLI(unittest.TestCase):
         runner = CliRunner()
         result = runner.invoke(cli.cli, ['discover'])
         
-        #print(result.output)
+        print(result.output)
+
         assert "Attempting to discover Sonoff LAN Mode devices on the local " \
                "network" in result.output
         assert "DiscoverDevice" in result.output     
 
         stop_device()
-
-        print(result.output)
 
     def test_cli_discover_debug(self):
         """Test the CLI."""
