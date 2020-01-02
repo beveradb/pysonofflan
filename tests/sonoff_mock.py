@@ -36,6 +36,8 @@ class SonoffLANModeDeviceMock:
 
         self._name += "Mock"
 
+        print("Device __init__ %s" % name)
+
         if self._sonoff_type is None:
             self._sonoff_type = "plug"
 
@@ -140,10 +142,10 @@ class SonoffLANModeDeviceMock:
         self._zeroconf_registrar.update_service(self.get_service_info())
 
 
-def start_device(name = None, device_type = None, api_key = None, ip = None, port = None):
+def start_device(name = None, sonoff_type = None, api_key = None, ip = None, port = None):
       
     print("starting device: %s" % name)
-    t = threading.Thread(target=start, args=(name, device_type, api_key, ip, port))
+    t = threading.Thread(target=start, args=(name, sonoff_type, api_key, ip, port))
     t.daemon = True
     t.start()
     print("device started: %s" % name)
@@ -152,6 +154,8 @@ def stop_device():
 
     print("stopping device")
     api.do_teardown_appcontext()
+    global device
+    device = None
     print("device stopped")
 
 def start(name, sonoff_type, api_key, ip, port):

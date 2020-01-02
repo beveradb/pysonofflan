@@ -145,7 +145,8 @@ class SonoffLANModeClient:
                     'Cache-Control': 'no-store'        
                 } )
 
-                self.http_session.headers.update(headers)
+                #self.http_session.headers.update(headers)
+                self.http_session.headers = headers
 
                 # find socket for end-point
                 socket_text = found_ip + ":" + str(info.port)          
