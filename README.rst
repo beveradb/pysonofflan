@@ -90,7 +90,8 @@ Command-Line Usage
                            Inching/Momentary switch.
       -v, --verbosity LVL  Either CRITICAL, ERROR, WARNING, INFO or DEBUG
       --help               Show this message and exit.
-
+      --api_key KEY        Needed fro devices not in DIY mode. See https://github.com/mattsaxon/pysonofflan/wiki/Finding-the-API__Key
+      
     Commands:
       discover  Discover devices in the network (takes ~1...
       listen    Connect to device, print state, then print...
