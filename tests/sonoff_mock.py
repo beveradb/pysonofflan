@@ -36,7 +36,7 @@ class SonoffLANModeDeviceMock:
 
         self._name += "Mock"
 
-        print("Device __init__ %s" % name)
+        print("Device __init__ %s" % self._name)
 
         if self._sonoff_type is None:
             self._sonoff_type = "plug"
