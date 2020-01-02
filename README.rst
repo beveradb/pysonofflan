@@ -54,15 +54,6 @@ Since mid 2018, the firmware Itead have shipped with most Sonoff devices
 has provided this feature, allowing devices to be controlled directly
 on the local network using a WebSocket connection on port 8081.
 
-The feature is designed to only be used when there is no connection
-to the Itead cloud servers, (e.g. if your internet connection is down,
-or their servers are down).
-As such, it is only enabled when the device is connected to your WiFi
-network, but *unable to reach the Itead servers*.
-
-Most users will only be able to use this by **deliberately
-blocking internet access** to their Sonoff devices.
-
 Features
 --------
 
