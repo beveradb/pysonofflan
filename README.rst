@@ -3,33 +3,37 @@ pySonoffLAN
 ===========
 
 
-.. image:: https://img.shields.io/pypi/v/pysonofflan.svg
-    :target: https://pypi.python.org/pypi/pysonofflan
+.. image:: https://img.shields.io/pypi/v/pysonofflanr3.svg
+    :target: https://pypi.python.org/pypi/pysonofflanr3
     :alt: Latest PyPi Release
 
-.. image:: https://img.shields.io/pypi/pyversions/pysonofflan.svg?style=flat
-    :target: https://pypi.python.org/pypi/pysonofflan
+.. image:: https://img.shields.io/pypi/pyversions/pysonofflanr3.svg?style=flat
+    :target: https://pypi.python.org/pypi/pysonofflanr3
     :alt: Supported Python Versions
 
-.. image:: https://img.shields.io/travis/beveradb/pysonofflan.svg
-    :target: https://travis-ci.org/beveradb/pysonofflan
+.. image:: https://img.shields.io/travis/mattsaxon/pysonofflan.svg
+    :target: https://travis-ci.org/mattsaxon/pysonofflan
     :alt: Build Status
 
-.. image:: https://readthedocs.org/projects/pysonofflan/badge/?version=latest
-    :target: https://pysonofflan.readthedocs.io/en/latest/?badge=latest
+.. image:: https://readthedocs.org/projects/pysonofflanr3/badge/?version=latest
+    :target: https://pysonofflanr3.readthedocs.io/en/latest/?badge=latest
     :alt: Documentation Status
 
-.. image:: https://coveralls.io/repos/github/beveradb/pysonofflan/badge.svg?branch=master
-    :target: https://coveralls.io/github/beveradb/pysonofflan?branch=master
+.. image:: https://coveralls.io/repos/github/mattsaxon/pysonofflan/badge.svg
+    :target: https://coveralls.io/github/mattsaxon/pysonofflan
     :alt: Code Coverage
 
-.. image:: https://img.shields.io/pypi/wheel/pysonofflan.svg
-    :target: https://pypi.org/project/pysonofflan/#files
+.. image:: https://img.shields.io/pypi/wheel/pysonofflanr3.svg
+    :target: https://pypi.org/project/pysonofflanr3/#files
     :alt: Has Wheel Package
-
-.. image:: https://pyup.io/repos/github/beveradb/pysonofflan/shield.svg
-    :target: https://pyup.io/repos/github/beveradb/pysonofflan/
+   
+.. image:: https://pyup.io/repos/github/mattsaxon/pysonofflan/shield.svg
+    :target: https://pyup.io/repos/github/mattsaxon/pysonofflan/
     :alt: Updates
+
+.. image:: https://pyup.io/repos/github/mattsaxon/pysonofflan/python-3-shield.svg
+     :target: https://pyup.io/repos/github/mattsaxon/pysonofflan/
+     :alt: Python 3
 
 
 Control Sonoff devices running original firmware, in LAN mode.
