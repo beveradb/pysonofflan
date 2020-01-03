@@ -20,7 +20,7 @@ pySonoffLAN
     :alt: Documentation Status
 
 .. image:: https://coveralls.io/repos/github/beveradb/pysonofflan/badge.svg?branch=master
-    :target: https://coveralls.io/github/mattsaxon/pysonofflan?branch=master
+    :target: https://coveralls.io/github/mattsaxon/pysonofflan?branch=V3-Firmware
     :alt: Code Coverage
 
 .. image:: https://img.shields.io/pypi/wheel/pysonofflan.svg
