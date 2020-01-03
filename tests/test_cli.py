@@ -67,7 +67,7 @@ class TestCLI(unittest.TestCase):
 
         """Test the CLI."""
         runner = CliRunner()
-        result = runner.invoke(cli.cli, ['--device_id', 'PlugOnMock', '-l', 'DEBUG', 'on'])
+        result = runner.invoke(cli.cli, ['--device_id', 'PlugOnMock', 'on'])
 
         print(result.output)
         
@@ -119,7 +119,7 @@ class TestCLI(unittest.TestCase):
 
     def test_cli_on_encrypt(self):
 
-        start_device("PlugEncrypt", "plug")
+        start_device("PlugEncrypt", "plug", "testkey")
 
         """Test the CLI."""
         runner = CliRunner()
@@ -131,7 +131,7 @@ class TestCLI(unittest.TestCase):
 
     def test_cli_on_strip_encrypt(self):
 
-        start_device("StripEncrypt", "strip")
+        start_device("StripEncrypt", "strip", "testkey")
 
         """Test the CLI."""
         runner = CliRunner()

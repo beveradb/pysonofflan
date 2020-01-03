@@ -26,7 +26,7 @@ import json
 
 def format_encryption_msg(payload, api_key, data):
 
-    payload["selfApikey"] = "cb0ff096-2a9d-4250-93ec-362fc1fe6f40" # This field needs to exist, but no idea what it is used for (https://github.com/itead/Sonoff_Devices_DIY_Tools/issues/5)
+    payload["selfApikey"] = "123" # This field needs to exist, but no idea what it is used for (https://github.com/itead/Sonoff_Devices_DIY_Tools/issues/5)
     iv = generate_iv()
     payload["iv"] = b64encode(iv).decode("utf-8") 
     payload["encrypt"] = True

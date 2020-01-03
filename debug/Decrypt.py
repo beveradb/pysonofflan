@@ -26,10 +26,5 @@ class SonoffR3:
 
         return plaintext
 
-device = SonoffR3(b'b5b46dce-d365-4f2e-b507-b09269c4ddb6')
-print(device.Decrypt(b'oCKuglULSEok8/xaS8ZMS9HPjpK/0WYgFrzaSnTnJSpbmKz2NCIee7Mhzvf9GU+/', b'"MDQ2OTgyMTAyMjcxODU3Ng=="'))
-
-device = SonoffR3(b'b5b46dce-d365-4f2e-b507-b09269c4ddb6')
-print(device.Decrypt(b'2BqVsSYoQxFP43zTKxZfc1i2CYDhTX6pYp4tGySiczMDnpYAb6/UTGhKt3kbhm+P', b'HwQWNfMgpBRjODqTUcH1+A=='))
-
-
+device = SonoffR3(b'apikey')
+print(device.Decrypt(b'ciphertext', b'iv'))
