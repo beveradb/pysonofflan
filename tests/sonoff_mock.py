@@ -9,6 +9,7 @@ api = Flask(__name__)
 device = None
 
 @api.route('/zeroconf/switch', methods=['POST'])
+@api.route('/zeroconf/switches', methods=['POST'])
 def post_switch():
 
     print("Device %s, Received: %s" % (device._name, request.json))

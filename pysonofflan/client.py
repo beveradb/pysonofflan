@@ -229,7 +229,10 @@ class SonoffLANModeClient:
 
     def send_switch(self, request: Union[str, Dict]):
 
-        response = self.send(request, self.url + '/zeroconf/switch')
+        if self.type == b'strip':
+            response = self.send(request, self.url + '/zeroconf/switches')
+        else:
+            response = self.send(request, self.url + '/zeroconf/switch')
 
         try:
             response_json = json.loads(response.content)
