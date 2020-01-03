@@ -63,8 +63,14 @@ class SonoffLANModeDeviceMock:
 
             return json.dumps({"seq":1,"sequence":"1577725767","error":0}), 200
 
+        def start():
+            api.run(host=self._ip, port=self._port)
 
-        api.run(host=self._ip, port=self._port)
+        print("starting device: %s" % self._name)
+        t = threading.Thread(target=start)
+        t.daemon = True
+        t.start()
+        print("device started: %s" % self._name)
 
 
     def register_on_network(self):
@@ -95,27 +101,51 @@ class SonoffLANModeDeviceMock:
 
         if self._sonoff_type == "strip":
 
-            self._properties['data1'] = b'{"sledOnline":"on","configure":[{"startup":"off","outlet":0},{"startup":"off","outlet":1},{"startup":"off","outlet":2},{"startup":"off","outlet":3}],'
-            self._properties['data2'] = b'"pulses":[{"pulse":"off","width":1000,"outlet":0},{"pulse":"off","width":1000,"outlet":1},{"pulse":"off","width":1000,"outlet":2},{"pulse":"off","width":1000,"outlet":3}],'
+            data = '{"sledOnline":"on","configure":[{"startup":"off","outlet":0},{"startup":"off","outlet":1},{"startup":"off","outlet":2},{"startup":"off","outlet":3}],'
+            data += '"pulses":[{"pulse":"off","width":1000,"outlet":0},{"pulse":"off","width":1000,"outlet":1},{"pulse":"off","width":1000,"outlet":2},{"pulse":"off","width":1000,"outlet":3}],'
         
             if self._status == "on":
-                self._properties['data3'] = b'"switches":[{"switch":"on","outlet":0},{"switch":"off","outlet":1},{"switch":"off","outlet":2},{"switch":"on","outlet":3}]}'
+                data += '"switches":[{"switch":"on","outlet":0},{"switch":"off","outlet":1},{"switch":"off","outlet":2},{"switch":"on","outlet":3}]}'
 
             else:
-                self._properties['data3'] = b'"switches":[{"switch":"off","outlet":0},{"switch":"off","outlet":1},{"switch":"off","outlet":2},{"switch":"on","outlet":3}]}'
+                data += '"switches":[{"switch":"off","outlet":0},{"switch":"off","outlet":1},{"switch":"off","outlet":2},{"switch":"on","outlet":3}]}'
 
         else:
 
             if self._status == "on":
-                self._properties['data1'] = '{"switch":"on","startup":"stay","pulse":"off","sledOnline":"off","pulseWidth":500,"rssi":-55}'
+                data = '{"switch":"on","startup":"stay","pulse":"off","sledOnline":"off","pulseWidth":500,"rssi":-55}'
             else:
-                self._properties['data1'] = '{"switch":"off","startup":"stay","pulse":"off","sledOnline":"off","pulseWidth":500,"rssi":-55}'
+                data = '{"switch":"off","startup":"stay","pulse":"off","sledOnline":"off","pulseWidth":500,"rssi":-55}'
 
-        
         if self._encrypt:
-            sonoffcrypto.format_encryption_txt(self._properties, self._api_key)
-            print(self._properties)
-       
+            data = sonoffcrypto.format_encryption_txt(self._properties, data, self._api_key)
+
+        self.split_data(data)
+              
+
+    def split_data(self, data):
+
+        if len(data) <= 249:
+            self._properties['data1'] = data
+
+        else:
+            self._properties['data1'] = data[0:249]
+            data = data[249:]
+
+            if len(data) <= 249:
+                self._properties['data2'] = data
+
+            else:
+                self._properties['data2'] = data[0:249]
+                data = data[249:]
+                    
+                if len(data) <= 249:
+                    self._properties['data3'] = data
+
+                else:
+                    self._properties['data3'] = data[0:249]
+                    self._properties['data4'] = data[249:]
+
 
     def get_status_from_data(self, data):
 
@@ -146,29 +176,13 @@ class SonoffLANModeDeviceMock:
    
         self._zeroconf_registrar.update_service(self.get_service_info())
 
-
 def start_device(name = None, sonoff_type = None, api_key = None, ip = None, port = None):
-      
-    print("starting device: %s" % name)
-    t = threading.Thread(target=start, args=(name, sonoff_type, api_key, ip, port))
-    t.daemon = True
-    t.start()
-    print("device started: %s" % name)
 
-def stop_device():
-
-     pass
-    #print("stopping device")
-    #api.do_teardown_appcontext()
-    #global device
-    #device = None
-    #print("device stopped")
-
-def start(name, sonoff_type, api_key, ip, port):
-
-    #global device
     device = SonoffLANModeDeviceMock(name, sonoff_type, api_key, ip, port)
     device.run_server()
+
+def stop_device():
+    pass
 
 
 if __name__ == '__main__':
@@ -188,4 +202,10 @@ if __name__ == '__main__':
     except:
         pass
 
-    start(name, sonoff_type, api_key, ip, port)
+    start_device(name, sonoff_type, api_key, ip, port)
+
+    try:
+        input("Press enter to exit...\n\n")
+
+    finally:
+        device = None

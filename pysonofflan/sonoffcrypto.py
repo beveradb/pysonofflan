@@ -38,20 +38,14 @@ def format_encryption_msg(payload, api_key, data):
         payload["data"] = encrypt(json.dumps(data, separators = (',', ':') ), iv, api_key)
 
 
-def format_encryption_txt(data, api_key):
+def format_encryption_txt(properties, data, api_key):
 
-    data["encrypt"] = True
+    properties["encrypt"] = True
 
     iv = generate_iv()
-    data["iv"] = b64encode(iv).decode("utf-8") 
+    properties["iv"] = b64encode(iv).decode("utf-8") 
 
-    try:
-        data["data1"] = encrypt(data["data1"], iv, api_key)
-        data["data2"] = encrypt(data["data2"], iv, api_key)
-        data["data3"] = encrypt(data["data3"], iv, api_key)
-        data["data4"] = encrypt(data["data4"], iv, api_key)
-    except KeyError:
-        pass
+    return encrypt(data, iv, api_key)
 
 
 def encrypt(data_element, iv, api_key):
