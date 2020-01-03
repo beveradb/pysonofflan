@@ -19,7 +19,7 @@ pySonoffLAN
     :target: https://pysonofflan.readthedocs.io/en/latest/?badge=latest
     :alt: Documentation Status
 
-.. image:: https://coveralls.io/repos/github/beveradb/pysonofflan/badge.svg?branch=master
+.. image:: https://coveralls.io/repos/github/mattsaxon/pysonofflan/badge.svg
     :target: https://coveralls.io/github/mattsaxon/pysonofflan
     :alt: Code Coverage
 
