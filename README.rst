@@ -26,10 +26,14 @@ pySonoffLAN
 .. image:: https://img.shields.io/pypi/wheel/pysonofflanr3.svg
     :target: https://pypi.org/project/pysonofflanr3/#files
     :alt: Has Wheel Package
-
+   
 .. image:: https://pyup.io/repos/github/mattsaxon/pysonofflan/shield.svg
     :target: https://pyup.io/repos/github/mattsaxon/pysonofflan/
     :alt: Updates
+
+.. image:: https://pyup.io/repos/github/mattsaxon/pysonofflan/python-3-shield.svg
+     :target: https://pyup.io/repos/github/mattsaxon/pysonofflan/
+     :alt: Python 3
 
 
 Control Sonoff devices running original firmware, in LAN mode.
