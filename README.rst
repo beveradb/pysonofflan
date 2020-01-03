@@ -12,7 +12,7 @@ pySonoffLAN
     :alt: Supported Python Versions
 
 .. image:: https://img.shields.io/travis/beveradb/pysonofflan.svg
-    :target: https://travis-ci.org/beveradb/pysonofflan
+    :target: https://travis-ci.org/mattsaxon/pysonofflan
     :alt: Build Status
 
 .. image:: https://readthedocs.org/projects/pysonofflan/badge/?version=latest
@@ -20,7 +20,7 @@ pySonoffLAN
     :alt: Documentation Status
 
 .. image:: https://coveralls.io/repos/github/beveradb/pysonofflan/badge.svg?branch=master
-    :target: https://coveralls.io/github/beveradb/pysonofflan?branch=master
+    :target: https://coveralls.io/github/mattsaxon/pysonofflan?branch=master
     :alt: Code Coverage
 
 .. image:: https://img.shields.io/pypi/wheel/pysonofflan.svg
