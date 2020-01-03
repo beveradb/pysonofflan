@@ -6,7 +6,7 @@ from zeroconf import ServiceBrowser, Zeroconf, ServiceInfo
 from pysonofflan import sonoffcrypto
 
 
-next_port = 8081
+next_port = 8082 # default port for class invocation is 8082 to stop conflicting with command line by default
 
 class SonoffLANModeDeviceMock:
 
@@ -52,6 +52,7 @@ class SonoffLANModeDeviceMock:
 
         @api.route('/zeroconf/switch', methods=['POST'])
         @api.route('/zeroconf/switches', methods=['POST'])
+        # pylint: disable=unused-variable
         def post_switch():
 
             print("Device %s, Received: %s" % (self._name, request.json))
@@ -191,7 +192,7 @@ if __name__ == '__main__':
     sonoff_type = None
     api_key = None
     ip = None
-    port = None
+    port = 8081 # use 8081 as default port form command line
 
     try:
         name = sys.argv[1]
