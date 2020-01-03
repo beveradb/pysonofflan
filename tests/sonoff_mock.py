@@ -5,22 +5,8 @@ from flask import Flask, json, request
 from zeroconf import ServiceBrowser, Zeroconf, ServiceInfo
 from pysonofflan import sonoffcrypto
 
-api = Flask(__name__)
-device = None
 
-@api.route('/zeroconf/switch', methods=['POST'])
-@api.route('/zeroconf/switches', methods=['POST'])
-def post_switch():
-
-    print("Device %s, Received: %s" % (device._name, request.json))
-
-    if request.json['deviceid'] == device._name:
-        device.process_request(request.json)
-    else:
-        print("wrong device")
-
-    return json.dumps({"seq":1,"sequence":"1577725767","error":0}), 200
-
+next_port = 8081
 
 class SonoffLANModeDeviceMock:
 
@@ -51,15 +37,33 @@ class SonoffLANModeDeviceMock:
             self._ip = "127.0.0.1"
 
         if self._port is None:
-            self._port = 8081
+            global next_port 
+            self._port = next_port
+            next_port += 1
 
         self._status = "off"
 
 
         self.register_on_network()
 
-
     def run_server(self):
+
+        api = Flask(self._name)
+
+        @api.route('/zeroconf/switch', methods=['POST'])
+        @api.route('/zeroconf/switches', methods=['POST'])
+        def post_switch():
+
+            print("Device %s, Received: %s" % (self._name, request.json))
+
+            if request.json['deviceid'] == self._name:
+                self.process_request(request.json)
+            else:
+                print("wrong device")
+
+            return json.dumps({"seq":1,"sequence":"1577725767","error":0}), 200
+
+
         api.run(host=self._ip, port=self._port)
 
 
@@ -153,15 +157,16 @@ def start_device(name = None, sonoff_type = None, api_key = None, ip = None, por
 
 def stop_device():
 
-    print("stopping device")
-    api.do_teardown_appcontext()
-    global device
-    device = None
-    print("device stopped")
+     pass
+    #print("stopping device")
+    #api.do_teardown_appcontext()
+    #global device
+    #device = None
+    #print("device stopped")
 
 def start(name, sonoff_type, api_key, ip, port):
 
-    global device
+    #global device
     device = SonoffLANModeDeviceMock(name, sonoff_type, api_key, ip, port)
     device.run_server()
 
