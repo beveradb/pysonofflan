@@ -1,6 +1,6 @@
-===========
-pySonoffLAN
-===========
+=============
+pySonoffLANR3
+=============
 
 
 .. image:: https://img.shields.io/pypi/v/pysonofflanr3.svg
