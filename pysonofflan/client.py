@@ -15,6 +15,9 @@ logger = logging.getLogger(__name__)
 V6_DEFAULT_TIMEOUT = 10
 V6_DEFAULT_PING_INTERVAL = 300
 
+# get only MAJOR.MINOR, discard whatever else comes afterward (ie: MICRO)
+WEBSOCKETS_VERSION = float('.'.join(websockets.__version__.split('.')[0:2]))
+
 class InvalidState(Exception):
     """
     Exception raised when an operation is forbidden in the current state.
@@ -120,7 +123,7 @@ class SonoffLANModeClientProtocol(websockets.WebSocketClientProtocol):
 
         logger.debug("__init__()" )
 
-        if float(websockets.__version__) < 7.0:
+        if WEBSOCKETS_VERSION < 7.0:
 
             self.ping_interval = V6_DEFAULT_PING_INTERVAL
             self.ping_timeout = V6_DEFAULT_TIMEOUT
@@ -139,7 +142,7 @@ class SonoffLANModeClientProtocol(websockets.WebSocketClientProtocol):
 
         super().connection_open()
 
-        if float(websockets.__version__) < 7.0:
+        if WEBSOCKETS_VERSION < 7.0:
 
             # Start the task that sends pings at regular intervals.
             self.keepalive_ping_task = asyncio.ensure_future(
@@ -151,7 +154,7 @@ class SonoffLANModeClientProtocol(websockets.WebSocketClientProtocol):
 
         logger.debug("keepalive_ping()" )
 
-        if float(websockets.__version__) >= 7.0:
+        if WEBSOCKETS_VERSION >= 7.0:
 
             super().keepalive_ping()
 
@@ -206,7 +209,7 @@ class SonoffLANModeClientProtocol(websockets.WebSocketClientProtocol):
 
         logger.debug("super.close_connection() finished" )
 
-        if float(websockets.__version__) < 7.0:
+        if WEBSOCKETS_VERSION < 7.0:
 
             # Cancel the keepalive ping task.
             if self.keepalive_ping_task is not None:
@@ -218,7 +221,7 @@ class SonoffLANModeClientProtocol(websockets.WebSocketClientProtocol):
 
         logger.debug("abort_keepalive_pings()")
 
-        if float(websockets.__version__) >= 7.0:
+        if WEBSOCKETS_VERSION >= 7.0:
             super().abort_keepalive_pings()
 
         else:
@@ -255,7 +258,7 @@ class SonoffLANModeClientProtocol(websockets.WebSocketClientProtocol):
 
         logger.debug("connection_lost()" )
 
-        if float(websockets.__version__) < 7.0:
+        if WEBSOCKETS_VERSION < 7.0:
 
             logger.debug("%s - event = connection_lost(%s)", self.side, exc)
             self.state = State.CLOSED
@@ -322,7 +325,7 @@ class SonoffLANModeClient:
                           websocket_address)
 
         try:
-            if float(websockets.__version__) >= 7.0:
+            if WEBSOCKETS_VERSION >= 7.0:
                 self.websocket = await websockets.connect(
                     websocket_address,
                     ping_interval=self.ping_interval,
